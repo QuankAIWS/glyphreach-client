@@ -1,0 +1,62 @@
+name: Client CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: glyphreach-client-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository-contract:
+    name: Public client repository contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Verify required ownership and policy files
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in README.md LICENSE NOTICE CONTRIBUTING.md SECURITY.md AGENTS.md .github/CODEOWNERS; do
+            test -f "$file" || { echo "missing required file: $file" >&2; exit 1; }
+          done
+          grep -Fq 'publicly viewable proprietary software' README.md
+          grep -Fq 'Copyright © 2026 QuankAIWS' LICENSE
+
+      - name: Enforce public-runner policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RIn --include='*.yml' --include='*.yaml' 'self-hosted' .github/workflows; then
+            echo 'Public GlyphReach client workflows must not target the private self-hosted runner.' >&2
+            exit 1
+          fi
+          if grep -RIn --include='*.yml' --include='*.yaml' 'pull_request_target' .github/workflows; then
+            echo 'pull_request_target is forbidden by default in the public client because fork code must not gain privileged workflow context.' >&2
+            exit 1
+          fi
+
+      - name: Reject obvious committed secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)\.env($|\.)' | grep -vE '(^|/)\.env\.example$'; then
+            echo 'tracked environment secret file detected' >&2
+            exit 1
+          fi
+          if git grep -nE 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY' -- . ':!*.md' ':!LICENSE' ':!NOTICE'; then
+            echo 'private-key material appears to be committed' >&2
+            exit 1
+          fi
