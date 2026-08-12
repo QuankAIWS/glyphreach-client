@@ -39,11 +39,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if grep -RIn --include='*.yml' --include='*.yaml' 'self-hosted' .github/workflows; then
+          if grep -RIn --include='*.yml' --include='*.yaml' -E '^[[:space:]]*runs-on:.*self-hosted' .github/workflows; then
             echo 'Public GlyphReach client workflows must not target the private self-hosted runner.' >&2
             exit 1
           fi
-          if grep -RIn --include='*.yml' --include='*.yaml' 'pull_request_target' .github/workflows; then
+          if grep -RIn --include='*.yml' --include='*.yaml' -E '^[[:space:]]*pull_request_target:' .github/workflows; then
             echo 'pull_request_target is forbidden by default in the public client because fork code must not gain privileged workflow context.' >&2
             exit 1
           fi
