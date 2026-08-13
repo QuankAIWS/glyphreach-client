@@ -1,1 +1,7 @@
-.m9-journal { margin-top: 12px; }
+.m9-journal { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(210, 186, 122, .2); }
+.world-canvas { position: relative; }
+.m9-world-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.m9-map-label { position: absolute; padding: 5px 7px; border: 1px solid rgba(195, 166, 104, .4); border-radius: 5px; background: rgba(14, 20, 21, .82); color: rgb(236, 218, 169); font-size: 10px; letter-spacing: .04em; transform: translate(-50%, -50%); box-shadow: 0 0 16px rgba(187, 147, 68, .12); }
+.m9-vault { left: 90%; top: 45%; }
+.m9-mark { left: 94.4%; top: 53%; }
+.m9-cache { left: 97.2%; top: 79%; opacity: .68; }
