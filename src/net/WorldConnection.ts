@@ -4,8 +4,10 @@ import {
   createBankWithdraw,
   createCancelGathering,
   createCancelProcessing,
+  createDialogueChoice,
   createEquipItem,
   createHello,
+  createInteractNpc,
   createMerchantBuy,
   createMerchantSell,
   createMoveIntent,
@@ -16,9 +18,11 @@ import {
   type ActionRejectedMessage,
   type CombatPlayerStateMessage,
   type CombatWorldStateMessage,
+  type DialogueStateMessage,
   type GatheringMode,
   type PlayerStateMessage,
   type Position,
+  type QuestStateMessage,
   type WelcomeMessage,
   type WorldStateMessage,
 } from '../protocol/v1';
@@ -36,6 +40,8 @@ export class WorldConnection {
     private readonly onPlayerState: (state: PlayerStateMessage) => void,
     private readonly onCombatWorldState: (state: CombatWorldStateMessage) => void,
     private readonly onCombatPlayerState: (state: CombatPlayerStateMessage) => void,
+    private readonly onQuestState: (state: QuestStateMessage) => void,
+    private readonly onDialogueState: (state: DialogueStateMessage) => void,
     private readonly onActionRejected: (message: ActionRejectedMessage) => void,
   ) {}
 
@@ -52,10 +58,16 @@ export class WorldConnection {
         this.onState(state, error.message);
         reject(error);
       };
-      const timeout = window.setTimeout(() => { socket.close(1000, 'handshake timeout'); finishReject(new Error('World handshake timed out')); }, timeoutMs);
+      const timeout = window.setTimeout(() => {
+        socket.close(1000, 'handshake timeout');
+        finishReject(new Error('World handshake timed out'));
+      }, timeoutMs);
       socket.addEventListener('open', () => socket.send(JSON.stringify(createHello(this.clientBuild, resumeToken))));
       socket.addEventListener('message', (event) => {
-        if (typeof event.data !== 'string') { if (!settled) finishReject(new Error('World server sent a non-text handshake message')); return; }
+        if (typeof event.data !== 'string') {
+          if (!settled) finishReject(new Error('World server sent a non-text handshake message'));
+          return;
+        }
         try {
           const message = parseServerMessage(event.data);
           if (message.type === 'REJECT') {
@@ -64,7 +76,12 @@ export class WorldConnection {
             return;
           }
           if (message.type === 'WELCOME') {
-            if (!settled) { settled = true; clearTimeout(timeout); this.onState('connected'); resolve(message); }
+            if (!settled) {
+              settled = true;
+              clearTimeout(timeout);
+              this.onState('connected');
+              resolve(message);
+            }
             return;
           }
           if (!settled) return;
@@ -72,6 +89,8 @@ export class WorldConnection {
           else if (message.type === 'PLAYER_STATE') this.onPlayerState(message);
           else if (message.type === 'COMBAT_WORLD_STATE') this.onCombatWorldState(message);
           else if (message.type === 'COMBAT_PLAYER_STATE') this.onCombatPlayerState(message);
+          else if (message.type === 'QUEST_STATE') this.onQuestState(message);
+          else if (message.type === 'DIALOGUE_STATE') this.onDialogueState(message);
           else this.onActionRejected(message);
         } catch (error) {
           socket.close(1002, 'invalid server message');
@@ -87,7 +106,10 @@ export class WorldConnection {
     });
   }
 
-  move(dx: -1 | 0 | 1, dy: -1 | 0 | 1): boolean { if (dx === 0 && dy === 0) return false; return this.send(createMoveIntent(this.sequence++, dx, dy)); }
+  move(dx: -1 | 0 | 1, dy: -1 | 0 | 1): boolean {
+    if (dx === 0 && dy === 0) return false;
+    return this.send(createMoveIntent(this.sequence++, dx, dy));
+  }
   moveTarget(target: Position): boolean { return this.send(createMoveTarget(this.sequence++, target)); }
   startGathering(nodeId: string, mode: GatheringMode): boolean { return this.send(createStartGathering(this.sequence++, nodeId, mode)); }
   cancelGathering(): boolean { return this.send(createCancelGathering(this.sequence++)); }
@@ -99,6 +121,14 @@ export class WorldConnection {
   merchantBuy(serviceId: string, itemId: string, quantity = 1): boolean { return this.send(createMerchantBuy(this.sequence++, serviceId, itemId, quantity)); }
   merchantSell(serviceId: string, itemId: string, quantity = 1): boolean { return this.send(createMerchantSell(this.sequence++, serviceId, itemId, quantity)); }
   attackTarget(targetId: string): boolean { return this.send(createAttackTarget(this.sequence++, targetId)); }
+  interactNpc(targetId: string): boolean { return this.send(createInteractNpc(this.sequence++, targetId)); }
+  dialogueChoice(npcId: string, choiceId: string): boolean { return this.send(createDialogueChoice(this.sequence++, npcId, choiceId)); }
   close(): void { this.socket?.close(1000, 'client shutdown'); this.socket = null; }
-  private send(message: object): boolean { const socket = this.socket; if (!socket || socket.readyState !== WebSocket.OPEN) return false; socket.send(JSON.stringify(message)); return true; }
+
+  private send(message: object): boolean {
+    const socket = this.socket;
+    if (!socket || socket.readyState !== WebSocket.OPEN) return false;
+    socket.send(JSON.stringify(message));
+    return true;
+  }
 }
