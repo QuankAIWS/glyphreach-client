@@ -1,25 +1,27 @@
 import { WorldConnection, type ConnectionState } from '../net/WorldConnection';
 import type {
-  ActionRejectedMessage,
   CombatPlayerStateMessage,
   CombatProgressSnapshot,
   CombatWorldStateMessage,
-  DialogueSnapshot,
-  DialogueStateMessage,
   EnemySnapshot,
   GatheringMode,
-  NpcSnapshot,
   PlayerProgressSnapshot,
   PlayerSnapshot,
   PlayerStateMessage,
-  QuestJournalSnapshot,
-  QuestStateMessage,
   ResourceNodeSnapshot,
   ServiceSnapshot,
   StationKind,
   StationSnapshot,
   WorldStateMessage,
 } from '../protocol/v1';
+import type {
+  ActionRejectedMessage,
+  DialogueSnapshot,
+  DialogueStateMessage,
+  NpcSnapshot,
+  QuestJournalSnapshot,
+  QuestStateMessage,
+} from '../protocol/quest-v1';
 import { WorldView } from '../world/WorldView';
 
 const RESUME_TOKEN_KEY = 'glyphreach.devResumeToken.v1';
@@ -45,24 +47,36 @@ export class GlyphReachApp {
     root.innerHTML = `
       <main class="shell">
         <header class="topbar">
-          <div><div class="eyebrow">FIRST QUEST LOOP</div><h1>GlyphReach</h1></div>
+          <div><div class="eyebrow">NORTHERN ROAD CHAPTER</div><h1>GlyphReach</h1></div>
           <div class="connection-pill" data-testid="connection-status">Connecting…</div>
         </header>
         <section class="world-shell" data-testid="world-shell">
           <div class="world-canvas" data-testid="world-canvas"></div>
           <aside class="connection-card">
             <div class="label">World</div><div data-testid="world-id">Awaiting server…</div>
+            <div class="skill-line"><span>Northern road</span><strong data-testid="north-road-status">Closed</strong></div>
+            <div class="skill-line"><span>Waystone</span><strong data-testid="waystone-status">Undiscovered</strong></div>
             <div class="label">Player</div><div data-testid="player-id">Awaiting server…</div>
             <div class="label">Players online</div><div data-testid="player-count">0</div>
             <div class="label">Position</div><div data-testid="local-position">—</div>
             <div class="label">Movement</div><div class="control-note">Click the world to move. WASD / arrows are alternate controls.</div>
 
-            <div class="label">Fieldwork</div>
-            <div class="skill-line"><span data-testid="quest-title">First Fieldwork</span><strong data-testid="quest-status">Available</strong></div>
+            <div class="label">Journal · Silent Bell</div>
+            <div class="skill-line"><span data-testid="quest-title">The Silent Bell</span><strong data-testid="quest-status">Available</strong></div>
             <div class="skill-line"><span>Mine fresh copper</span><strong data-testid="quest-mine-status">—</strong></div>
-            <div class="skill-line"><span>Defeat Reach rat</span><strong data-testid="quest-rat-status">—</strong></div>
+            <div class="skill-line"><span>Forge a blade</span><strong data-testid="quest-forge-status">—</strong></div>
+            <div class="skill-line"><span>Clear bell route</span><strong data-testid="quest-rat-status">—</strong></div>
             <div class="skill-line"><span>Bring proof</span><strong data-testid="quest-proof-status">—</strong></div>
             <div class="button-stack"><button type="button" data-testid="interact-surveyor">Talk to Surveyor Rhea</button></div>
+
+            <div class="label">Journal · Northwatch</div>
+            <div class="skill-line"><span data-testid="north-quest-title">A Cold Supper</span><strong data-testid="north-quest-status">Locked</strong></div>
+            <div class="skill-line"><span>Catch supper</span><strong data-testid="north-quest-fish-status">—</strong></div>
+            <div class="skill-line"><span>Cook supper</span><strong data-testid="north-quest-cook-status">—</strong></div>
+            <div class="skill-line"><span>Clear the ford</span><strong data-testid="north-quest-wolf-status">—</strong></div>
+            <div class="skill-line"><span>Bring supper + pelt</span><strong data-testid="north-quest-proof-status">—</strong></div>
+            <div class="button-stack"><button type="button" data-testid="interact-sella">Talk to Cook Sella</button></div>
+
             <div class="dialogue-card" data-testid="dialogue-panel" hidden>
               <strong data-testid="dialogue-speaker"></strong>
               <div data-testid="dialogue-text"></div>
@@ -73,15 +87,26 @@ export class GlyphReachApp {
             <div class="skill-line"><span>Health</span><strong data-testid="combat-health">— / —</strong></div>
             <div class="skill-line"><span>Combat level / XP</span><strong><span data-testid="combat-level">1</span> · <span data-testid="combat-xp">0</span></strong></div>
             <div class="skill-line"><span>Reach rat</span><strong data-testid="rat-health">—</strong></div>
+            <div class="skill-line"><span>Road wolf</span><strong data-testid="wolf-health">—</strong></div>
             <div class="skill-line"><span>Weapon</span><strong data-testid="equipped-weapon">None</strong></div>
-            <div class="button-stack"><button type="button" data-testid="attack-reach-rat">Attack Reach rat</button></div>
+            <div class="button-stack">
+              <button type="button" data-testid="attack-reach-rat">Attack Reach rat</button>
+              <button type="button" data-testid="attack-road-wolf">Attack road wolf</button>
+              <button type="button" data-testid="eat-riverfish">Eat cooked Northwater fish</button>
+            </div>
 
             <div class="label">Wallet</div><div class="skill-line"><span>Coins</span><strong data-testid="wallet-coins">0</strong></div>
             <div class="label">Mining</div><div class="skill-line"><span>Level / XP</span><strong><span data-testid="mining-level">1</span> · <span data-testid="mining-xp">0</span></strong></div>
-            <div class="button-stack"><button type="button" data-testid="mine-focused">Focused mine</button><button type="button" data-testid="mine-steady">Steady mine · AFK</button><button type="button" class="button-muted" data-testid="mine-cancel">Cancel Mining</button></div>
+            <div class="button-stack"><button type="button" data-testid="mine-focused">Focused mine</button><button type="button" data-testid="mine-steady">Steady mine · AFK</button><button type="button" class="button-muted" data-testid="mine-cancel">Cancel gathering</button></div>
+
+            <div class="label">Fishing</div><div class="skill-line"><span>Level / XP</span><strong><span data-testid="fishing-level">1</span> · <span data-testid="fishing-xp">0</span></strong></div>
+            <div class="button-stack"><button type="button" data-testid="fish-focused">Focused fish</button><button type="button" data-testid="fish-steady">Steady fish · AFK</button></div>
 
             <div class="label">Smithing</div><div class="skill-line"><span>Level / XP</span><strong><span data-testid="smithing-level">1</span> · <span data-testid="smithing-xp">0</span></strong></div>
             <div class="button-stack"><button type="button" data-testid="smelt-copper">Smelt copper ore</button><button type="button" data-testid="smith-pickaxe">Smith copper pickaxe</button><button type="button" data-testid="smith-sword">Smith copper sword</button><button type="button" class="button-muted" data-testid="processing-cancel">Cancel processing</button><button type="button" data-testid="equip-pickaxe">Equip copper pickaxe</button><button type="button" data-testid="equip-sword">Equip copper sword</button></div>
+
+            <div class="label">Cooking</div><div class="skill-line"><span>Level / XP</span><strong><span data-testid="cooking-level">1</span> · <span data-testid="cooking-xp">0</span></strong></div>
+            <div class="button-stack"><button type="button" data-testid="cook-riverfish">Cook Northwater fish</button></div>
 
             <div class="label">Bank</div>
             <div class="skill-line"><span>Slots</span><strong data-testid="bank-slots">0 / —</strong></div>
@@ -101,6 +126,11 @@ export class GlyphReachApp {
             <div class="skill-line"><span>Copper pickaxe</span><strong data-testid="copper-pickaxe-count">0</strong></div>
             <div class="skill-line"><span>Copper sword</span><strong data-testid="copper-sword-count">0</strong></div>
             <div class="skill-line"><span>Reach rat tail</span><strong data-testid="rat-tail-count">0</strong></div>
+            <div class="skill-line"><span>Raw Northwater fish</span><strong data-testid="raw-fish-count">0</strong></div>
+            <div class="skill-line"><span>Cooked Northwater fish</span><strong data-testid="cooked-fish-count">0</strong></div>
+            <div class="skill-line"><span>Fish bones</span><strong data-testid="fish-bones-count">0</strong></div>
+            <div class="skill-line"><span>Road wolf pelt</span><strong data-testid="wolf-pelt-count">0</strong></div>
+            <div class="skill-line"><span>Waystone fragment</span><strong data-testid="waystone-fragment-count">0</strong></div>
             <div class="label">Equipped tool</div><div data-testid="equipped-tool">None</div>
             <div class="label">World revision</div><div data-testid="world-revision">—</div>
             <div class="label">Build pair</div><div class="build-pair"><span>client <code data-testid="client-build"></code></span><span>server <code data-testid="server-build">—</code></span></div>
@@ -124,14 +154,20 @@ export class GlyphReachApp {
       (message) => this.applyActionRejected(root, message),
     );
 
-    this.button(root, 'interact-surveyor', () => this.interactSurveyor());
-    this.button(root, 'attack-reach-rat', () => this.attackReachRat());
-    this.button(root, 'mine-focused', () => this.startMining('focused'));
-    this.button(root, 'mine-steady', () => this.startMining('steady'));
+    this.button(root, 'interact-surveyor', () => this.interactNpc('surveyor-alpha-1'));
+    this.button(root, 'interact-sella', () => this.interactNpc('northwatch-cook-alpha-1'));
+    this.button(root, 'attack-reach-rat', () => this.attackEnemy('reach_rat'));
+    this.button(root, 'attack-road-wolf', () => this.attackEnemy('road_wolf'));
+    this.button(root, 'eat-riverfish', () => this.useFood());
+    this.button(root, 'mine-focused', () => this.startGathering('copper_vein', 'focused'));
+    this.button(root, 'mine-steady', () => this.startGathering('copper_vein', 'steady'));
+    this.button(root, 'fish-focused', () => this.startGathering('river_pool', 'focused'));
+    this.button(root, 'fish-steady', () => this.startGathering('river_pool', 'steady'));
     this.button(root, 'mine-cancel', () => this.connection?.cancelGathering());
     this.button(root, 'smelt-copper', () => this.startProcessing('furnace', 'smelt_copper'));
     this.button(root, 'smith-pickaxe', () => this.startProcessing('anvil', 'smith_copper_pickaxe'));
     this.button(root, 'smith-sword', () => this.startProcessing('anvil', 'smith_copper_sword'));
+    this.button(root, 'cook-riverfish', () => this.startProcessing('campfire', 'cook_riverfish'));
     this.button(root, 'processing-cancel', () => this.connection?.cancelProcessing());
     this.button(root, 'equip-pickaxe', () => this.connection?.equipItem('copper_pickaxe'));
     this.button(root, 'equip-sword', () => this.connection?.equipItem('copper_sword'));
@@ -198,8 +234,10 @@ export class GlyphReachApp {
     this.enemies = state.enemies;
     this.worldView.updateEnemies(state.enemies);
     this.renderCombat(root);
+    const wolf = state.enemies.find((enemy) => enemy.kind === 'road_wolf');
     const rat = state.enemies.find((enemy) => enemy.kind === 'reach_rat');
-    if (rat && !rat.alive) this.requireElement(root, '[data-testid="action-status"]').textContent = 'Reach rat defeated · authoritative drop granted. It will respawn.';
+    if (wolf && !wolf.alive) this.requireElement(root, '[data-testid="action-status"]').textContent = 'Road wolf defeated · the northern ford is clear for now.';
+    else if (rat && !rat.alive) this.requireElement(root, '[data-testid="action-status"]').textContent = 'Reach rat defeated · authoritative drop granted. It will respawn.';
   }
 
   private applyCombatPlayerState(root: HTMLElement, state: CombatPlayerStateMessage): void {
@@ -219,19 +257,19 @@ export class GlyphReachApp {
   }
 
   private applyActionRejected(root: HTMLElement, message: ActionRejectedMessage): void {
-    const labels: Record<ActionRejectedMessage['reason'], string> = {
+    const labels: Record<string, string> = {
       invalid_target: 'That target or destination is not valid.',
       too_far: 'Move closer to the required world object first.',
-      node_unavailable: 'That vein is depleted. Give it a moment.',
+      node_unavailable: 'That resource is unavailable. Give it a moment.',
       inventory_full: 'Your inventory is full.',
       already_busy: 'Finish or cancel the current activity first.',
-      not_gathering: 'There is no Mining action to cancel.',
+      not_gathering: 'There is no gathering action to cancel.',
       not_processing: 'There is no processing action to cancel.',
       invalid_recipe: 'That recipe is not available.',
       wrong_station: 'That recipe needs a different station.',
       missing_items: 'You do not have the required materials or quest proof.',
       item_not_owned: 'You do not have enough of that item in your inventory.',
-      invalid_equipment: 'That item cannot be equipped there.',
+      invalid_equipment: 'That item cannot be used there.',
       invalid_service: 'That world service is not available.',
       invalid_quantity: 'That quantity is not allowed.',
       bank_full: 'Your bank has no room for that item.',
@@ -247,8 +285,10 @@ export class GlyphReachApp {
       invalid_choice: 'That response is not valid for the current conversation.',
       quest_not_ready: 'The quest objectives are not ready to turn in yet.',
       quest_already_completed: 'That quest has already been completed and rewarded.',
+      full_health: 'You are already at full health.',
+      route_locked: 'The northern road is still closed. Finish The Silent Bell first.',
     };
-    this.requireElement(root, '[data-testid="action-status"]').textContent = labels[message.reason];
+    this.requireElement(root, '[data-testid="action-status"]').textContent = labels[message.reason] ?? `Action rejected: ${message.reason}`;
   }
 
   private updatePlayerSummary(root: HTMLElement, players: PlayerSnapshot[]): void {
@@ -258,18 +298,28 @@ export class GlyphReachApp {
   }
 
   private renderQuest(root: HTMLElement): void {
-    const quest = this.quests.find((candidate) => candidate.questId === 'first-fieldwork-alpha');
-    if (!quest) return;
-    this.requireElement(root, '[data-testid="quest-title"]').textContent = quest.title;
-    this.requireElement(root, '[data-testid="quest-status"]').textContent = quest.status === 'completed'
-      ? 'Completed'
-      : quest.status === 'active'
-        ? (quest.stage === 'return' ? 'Return to Surveyor' : 'Active')
-        : 'Available';
-    const objective = (id: string) => quest.objectives.find((candidate) => candidate.id === id)?.complete ?? false;
-    this.requireElement(root, '[data-testid="quest-mine-status"]').textContent = objective('mine_copper') ? 'Done' : 'Pending';
-    this.requireElement(root, '[data-testid="quest-rat-status"]').textContent = objective('defeat_rat') ? 'Done' : 'Pending';
-    this.requireElement(root, '[data-testid="quest-proof-status"]').textContent = objective('bring_proof') ? 'Ready' : 'Pending';
+    const silentBell = this.quests.find((candidate) => candidate.questId === 'first-fieldwork-alpha');
+    if (silentBell) {
+      this.requireElement(root, '[data-testid="quest-title"]').textContent = silentBell.title;
+      this.requireElement(root, '[data-testid="quest-status"]').textContent = statusLabel(silentBell, 'Surveyor');
+      this.requireElement(root, '[data-testid="quest-mine-status"]').textContent = objectiveLabel(silentBell, 'mine_copper');
+      this.requireElement(root, '[data-testid="quest-forge-status"]').textContent = objectiveLabel(silentBell, 'forge_blade');
+      this.requireElement(root, '[data-testid="quest-rat-status"]').textContent = objectiveLabel(silentBell, 'defeat_rat');
+      this.requireElement(root, '[data-testid="quest-proof-status"]').textContent = objectiveLabel(silentBell, 'bring_proof', 'Ready');
+    }
+
+    const north = this.quests.find((candidate) => candidate.questId === 'north-road-provisions-alpha');
+    if (!north) {
+      this.requireElement(root, '[data-testid="north-quest-status"]').textContent = 'Locked';
+      for (const id of ['north-quest-fish-status', 'north-quest-cook-status', 'north-quest-wolf-status', 'north-quest-proof-status']) this.requireElement(root, `[data-testid="${id}"]`).textContent = '—';
+      return;
+    }
+    this.requireElement(root, '[data-testid="north-quest-title"]').textContent = north.title;
+    this.requireElement(root, '[data-testid="north-quest-status"]').textContent = statusLabel(north, 'Cook Sella');
+    this.requireElement(root, '[data-testid="north-quest-fish-status"]').textContent = objectiveLabel(north, 'catch_supper');
+    this.requireElement(root, '[data-testid="north-quest-cook-status"]').textContent = objectiveLabel(north, 'cook_supper');
+    this.requireElement(root, '[data-testid="north-quest-wolf-status"]').textContent = objectiveLabel(north, 'clear_ford');
+    this.requireElement(root, '[data-testid="north-quest-proof-status"]').textContent = objectiveLabel(north, 'bring_supper', 'Ready');
   }
 
   private renderDialogue(root: HTMLElement): void {
@@ -301,24 +351,50 @@ export class GlyphReachApp {
     this.requireElement(root, '[data-testid="mining-xp"]').textContent = String(progress.skills.mining.xp);
     this.requireElement(root, '[data-testid="smithing-level"]').textContent = String(progress.skills.smithing.level);
     this.requireElement(root, '[data-testid="smithing-xp"]').textContent = String(progress.skills.smithing.xp);
-    this.requireElement(root, '[data-testid="inventory-slots"]').textContent = `${progress.inventory.slots.length} / ${progress.inventory.capacity}`;
-    this.requireElement(root, '[data-testid="copper-ore-count"]').textContent = String(this.itemCount(progress.inventory.slots, 'copper_ore'));
-    this.requireElement(root, '[data-testid="copper-bar-count"]').textContent = String(this.itemCount(progress.inventory.slots, 'copper_bar'));
-    this.requireElement(root, '[data-testid="copper-pickaxe-count"]').textContent = String(this.itemCount(progress.inventory.slots, 'copper_pickaxe'));
-    this.requireElement(root, '[data-testid="copper-sword-count"]').textContent = String(this.itemCount(progress.inventory.slots, 'copper_sword'));
-    this.requireElement(root, '[data-testid="rat-tail-count"]').textContent = String(this.itemCount(progress.inventory.slots, 'reach_rat_tail'));
+    this.requireElement(root, '[data-testid="fishing-level"]').textContent = String(progress.skills.fishing.level);
+    this.requireElement(root, '[data-testid="fishing-xp"]').textContent = String(progress.skills.fishing.xp);
+    this.requireElement(root, '[data-testid="cooking-level"]').textContent = String(progress.skills.cooking.level);
+    this.requireElement(root, '[data-testid="cooking-xp"]').textContent = String(progress.skills.cooking.xp);
+    this.requireElement(root, '[data-testid="north-road-status"]').textContent = progress.worldFlags.northernRoadOpen ? 'Open' : 'Closed';
+    const discovered = progress.discoveries.includes('weathered-waystone-alpha-1');
+    this.requireElement(root, '[data-testid="waystone-status"]').textContent = discovered ? 'Found' : progress.worldFlags.northernRoadOpen ? 'Uncharted' : 'Beyond closed road';
+    this.worldView.updateChapterState(progress.worldFlags.northernRoadOpen, progress.discoveries);
+
+    const inventory = progress.inventory.slots;
+    this.requireElement(root, '[data-testid="inventory-slots"]').textContent = `${inventory.length} / ${progress.inventory.capacity}`;
+    const inventoryIds: Record<string, string> = {
+      'copper-ore-count': 'copper_ore',
+      'copper-bar-count': 'copper_bar',
+      'copper-pickaxe-count': 'copper_pickaxe',
+      'copper-sword-count': 'copper_sword',
+      'rat-tail-count': 'reach_rat_tail',
+      'raw-fish-count': 'raw_riverfish',
+      'cooked-fish-count': 'cooked_riverfish',
+      'fish-bones-count': 'fish_bones',
+      'wolf-pelt-count': 'road_wolf_pelt',
+      'waystone-fragment-count': 'waystone_fragment',
+    };
+    for (const [testId, itemId] of Object.entries(inventoryIds)) this.requireElement(root, `[data-testid="${testId}"]`).textContent = String(this.itemCount(inventory, itemId));
+
     this.requireElement(root, '[data-testid="bank-slots"]').textContent = `${progress.bank.slots.length} / ${progress.bank.capacity}`;
     this.requireElement(root, '[data-testid="bank-copper-ore-count"]').textContent = String(this.itemCount(progress.bank.slots, 'copper_ore'));
     this.requireElement(root, '[data-testid="equipped-tool"]').textContent = progress.equipment.toolItemId === 'copper_pickaxe' ? 'Copper pickaxe' : 'None';
+
     if (progress.processing) {
       const label = progress.processing.recipeId === 'smelt_copper'
         ? 'Smelting copper…'
         : progress.processing.recipeId === 'smith_copper_sword'
           ? 'Smithing copper sword…'
-          : 'Smithing copper pickaxe…';
+          : progress.processing.recipeId === 'cook_riverfish'
+            ? 'Cooking Northwater fish…'
+            : 'Smithing copper pickaxe…';
       this.requireElement(root, '[data-testid="action-status"]').textContent = label;
     } else if (progress.gathering) {
-      this.requireElement(root, '[data-testid="action-status"]').textContent = progress.gathering.mode === 'steady' ? 'Steady Mining active · continues automatically.' : 'Focused Mining…';
+      const resource = this.resources.find((candidate) => candidate.id === progress.gathering?.nodeId);
+      const activity = resource?.kind === 'river_pool' ? 'Fishing' : 'Mining';
+      this.requireElement(root, '[data-testid="action-status"]').textContent = progress.gathering.mode === 'steady'
+        ? `Steady ${activity} active · continues automatically.`
+        : `Focused ${activity}…`;
     }
   }
 
@@ -331,7 +407,9 @@ export class GlyphReachApp {
       this.requireElement(root, '[data-testid="equipped-weapon"]').textContent = combat.equipment.weaponItemId === 'copper_sword' ? 'Copper sword' : 'None';
     }
     const rat = this.enemies.find((enemy) => enemy.kind === 'reach_rat');
-    this.requireElement(root, '[data-testid="rat-health"]').textContent = rat ? (rat.alive ? `${rat.health} / ${rat.maxHealth}` : 'Defeated') : '—';
+    const wolf = this.enemies.find((enemy) => enemy.kind === 'road_wolf');
+    this.requireElement(root, '[data-testid="rat-health"]').textContent = enemyHealthLabel(rat);
+    this.requireElement(root, '[data-testid="wolf-health"]').textContent = enemyHealthLabel(wolf);
   }
 
   private renderMerchantPrices(root: HTMLElement): void {
@@ -345,10 +423,10 @@ export class GlyphReachApp {
     return slots.filter((slot) => slot.itemId === itemId).reduce((total, slot) => total + slot.quantity, 0);
   }
 
-  private interactSurveyor(): void {
-    const npc = this.npcs.find((candidate) => candidate.id === 'surveyor-alpha-1');
+  private interactNpc(id: string): void {
+    const npc = this.npcs.find((candidate) => candidate.id === id);
     if (!npc || !this.connection || !this.root) return;
-    if (this.connection.interactNpc(npc.id)) this.requireElement(this.root, '[data-testid="action-status"]').textContent = 'Talking to Surveyor Rhea…';
+    if (this.connection.interactNpc(npc.id)) this.requireElement(this.root, '[data-testid="action-status"]').textContent = `Talking to ${npc.displayName}…`;
   }
 
   private chooseDialogue(choiceId: string): void {
@@ -356,27 +434,38 @@ export class GlyphReachApp {
     if (this.connection.dialogueChoice(this.dialogue.npcId, choiceId)) this.requireElement(this.root, '[data-testid="action-status"]').textContent = 'Sending response…';
   }
 
-  private attackReachRat(): void {
-    const rat = this.enemies.find((enemy) => enemy.kind === 'reach_rat');
-    if (!rat || !this.connection || !this.root) return;
-    if (this.connection.attackTarget(rat.id)) this.requireElement(this.root, '[data-testid="action-status"]').textContent = 'Attacking Reach rat…';
+  private attackEnemy(kind: EnemySnapshot['kind']): void {
+    const enemy = this.enemies.find((candidate) => candidate.kind === kind);
+    if (!enemy || !this.connection || !this.root) return;
+    if (this.connection.attackTarget(enemy.id)) this.requireElement(this.root, '[data-testid="action-status"]').textContent = kind === 'road_wolf' ? 'Attacking road wolf…' : 'Attacking Reach rat…';
   }
 
-  private startMining(mode: GatheringMode): void {
-    const node = this.resources.find((resource) => resource.kind === 'copper_vein');
+  private useFood(): void {
+    if (!this.connection || !this.root) return;
+    if (this.connection.useItem('cooked_riverfish')) this.requireElement(this.root, '[data-testid="action-status"]').textContent = 'Eating Northwater fish…';
+  }
+
+  private startGathering(kind: ResourceNodeSnapshot['kind'], mode: GatheringMode): void {
+    const node = this.resources.find((resource) => resource.kind === kind);
     if (!node || !this.connection || !this.root) return;
-    if (this.connection.startGathering(node.id, mode)) this.requireElement(this.root, '[data-testid="action-status"]').textContent = mode === 'steady' ? 'Starting steady Mining…' : 'Starting focused Mining…';
+    if (this.connection.startGathering(node.id, mode)) {
+      const activity = kind === 'river_pool' ? 'Fishing' : 'Mining';
+      this.requireElement(this.root, '[data-testid="action-status"]').textContent = `Starting ${mode === 'steady' ? 'steady' : 'focused'} ${activity}…`;
+    }
   }
 
   private startProcessing(kind: StationKind, recipeId: string): void {
     const station = this.stations.find((candidate) => candidate.kind === kind);
     if (!station || !this.connection || !this.root) return;
     if (this.connection.startProcessing(station.id, recipeId)) {
-      this.requireElement(this.root, '[data-testid="action-status"]').textContent = recipeId === 'smelt_copper'
+      const label = recipeId === 'smelt_copper'
         ? 'Starting smelt…'
         : recipeId === 'smith_copper_sword'
           ? 'Starting sword smithing…'
-          : 'Starting pickaxe smithing…';
+          : recipeId === 'cook_riverfish'
+            ? 'Starting cooking…'
+            : 'Starting pickaxe smithing…';
+      this.requireElement(this.root, '[data-testid="action-status"]').textContent = label;
     }
   }
 
@@ -424,6 +513,21 @@ export class GlyphReachApp {
     if (!element) throw new Error(`Missing app element: ${selector}`);
     return element;
   }
+}
+
+function statusLabel(quest: QuestJournalSnapshot, returnNpc: string): string {
+  if (quest.status === 'completed') return 'Completed';
+  if (quest.status === 'not_started') return 'Available';
+  return quest.stage === 'return' ? `Return to ${returnNpc}` : 'Active';
+}
+
+function objectiveLabel(quest: QuestJournalSnapshot, id: string, completedLabel = 'Done'): string {
+  return quest.objectives.find((candidate) => candidate.id === id)?.complete ? completedLabel : 'Pending';
+}
+
+function enemyHealthLabel(enemy: EnemySnapshot | undefined): string {
+  if (!enemy) return '—';
+  return enemy.alive ? `${enemy.health} / ${enemy.maxHealth}` : 'Defeated';
 }
 
 function directionForKey(key: string): { dx: -1 | 0 | 1; dy: -1 | 0 | 1 } | null {
