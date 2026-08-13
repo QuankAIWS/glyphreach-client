@@ -1,8 +1,12 @@
 import {
+  createBankDeposit,
+  createBankWithdraw,
   createCancelGathering,
   createCancelProcessing,
   createEquipItem,
   createHello,
+  createMerchantBuy,
+  createMerchantSell,
   createMoveIntent,
   createMoveTarget,
   createStartGathering,
@@ -83,6 +87,10 @@ export class WorldConnection {
   startProcessing(stationId: string, recipeId: string): boolean { return this.send(createStartProcessing(this.sequence++, stationId, recipeId)); }
   cancelProcessing(): boolean { return this.send(createCancelProcessing(this.sequence++)); }
   equipItem(itemId: string): boolean { return this.send(createEquipItem(this.sequence++, itemId)); }
+  bankDeposit(serviceId: string, itemId: string, quantity = 1): boolean { return this.send(createBankDeposit(this.sequence++, serviceId, itemId, quantity)); }
+  bankWithdraw(serviceId: string, itemId: string, quantity = 1): boolean { return this.send(createBankWithdraw(this.sequence++, serviceId, itemId, quantity)); }
+  merchantBuy(serviceId: string, itemId: string, quantity = 1): boolean { return this.send(createMerchantBuy(this.sequence++, serviceId, itemId, quantity)); }
+  merchantSell(serviceId: string, itemId: string, quantity = 1): boolean { return this.send(createMerchantSell(this.sequence++, serviceId, itemId, quantity)); }
   close(): void { this.socket?.close(1000, 'client shutdown'); this.socket = null; }
   private send(message: object): boolean { const socket = this.socket; if (!socket || socket.readyState !== WebSocket.OPEN) return false; socket.send(JSON.stringify(message)); return true; }
 }
