@@ -1,0 +1,30 @@
+{
+  "name": "@quankaiws/glyphreach-client",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "node --import tsx --test test/protocol.test.ts",
+    "test:e2e": "playwright test",
+    "test:mock-backend": "tsx test/support/mock-backend.ts",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "pixi.js": "8.18.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@types/node": "24.1.0",
+    "@types/ws": "8.18.1",
+    "tsx": "4.23.1",
+    "typescript": "7.0.2",
+    "vite": "8.1.5",
+    "ws": "8.21.1"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  }
+}
