@@ -64,7 +64,9 @@ test('The Stone Below turns the waystone lead into a prepared ruin clear', async
     await expect(page.getByTestId('wallet-coins')).toHaveText('56');
     await expect(page.getByTestId('stone-quest-status')).toHaveText('Return to Surveyor');
 
-    await move(0.972, 0.79);
+    // WorldView reserves a 36px frame around the playable 1000x600 projection,
+    // so this screen-space ratio resolves to roughly world (972, 474).
+    await move(0.935, 0.75);
     await expect(page.getByTestId('old-route-token-count')).toHaveText('1');
     await move(0.477, 0.565);
     await page.getByTestId('interact-surveyor').click();
