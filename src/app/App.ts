@@ -4,11 +4,16 @@ import type {
   CombatPlayerStateMessage,
   CombatProgressSnapshot,
   CombatWorldStateMessage,
+  DialogueSnapshot,
+  DialogueStateMessage,
   EnemySnapshot,
   GatheringMode,
+  NpcSnapshot,
   PlayerProgressSnapshot,
   PlayerSnapshot,
   PlayerStateMessage,
+  QuestJournalSnapshot,
+  QuestStateMessage,
   ResourceNodeSnapshot,
   ServiceSnapshot,
   StationKind,
@@ -28,6 +33,9 @@ export class GlyphReachApp {
   private stations: StationSnapshot[] = [];
   private services: ServiceSnapshot[] = [];
   private enemies: EnemySnapshot[] = [];
+  private npcs: NpcSnapshot[] = [];
+  private quests: QuestJournalSnapshot[] = [];
+  private dialogue: DialogueSnapshot | null = null;
   private progress: PlayerProgressSnapshot | null = null;
   private combat: CombatProgressSnapshot | null = null;
   private readonly onKeyDown = (event: KeyboardEvent) => this.handleKeyDown(event);
@@ -36,7 +44,10 @@ export class GlyphReachApp {
     this.root = root;
     root.innerHTML = `
       <main class="shell">
-        <header class="topbar"><div><div class="eyebrow">FIRST COMBAT LOOP</div><h1>GlyphReach</h1></div><div class="connection-pill" data-testid="connection-status">Connecting…</div></header>
+        <header class="topbar">
+          <div><div class="eyebrow">FIRST QUEST LOOP</div><h1>GlyphReach</h1></div>
+          <div class="connection-pill" data-testid="connection-status">Connecting…</div>
+        </header>
         <section class="world-shell" data-testid="world-shell">
           <div class="world-canvas" data-testid="world-canvas"></div>
           <aside class="connection-card">
@@ -46,6 +57,18 @@ export class GlyphReachApp {
             <div class="label">Position</div><div data-testid="local-position">—</div>
             <div class="label">Movement</div><div class="control-note">Click the world to move. WASD / arrows are alternate controls.</div>
 
+            <div class="label">Fieldwork</div>
+            <div class="skill-line"><span data-testid="quest-title">First Fieldwork</span><strong data-testid="quest-status">Available</strong></div>
+            <div class="skill-line"><span>Mine fresh copper</span><strong data-testid="quest-mine-status">—</strong></div>
+            <div class="skill-line"><span>Defeat Reach rat</span><strong data-testid="quest-rat-status">—</strong></div>
+            <div class="skill-line"><span>Bring proof</span><strong data-testid="quest-proof-status">—</strong></div>
+            <div class="button-stack"><button type="button" data-testid="interact-surveyor">Talk to Surveyor Rhea</button></div>
+            <div class="dialogue-card" data-testid="dialogue-panel" hidden>
+              <strong data-testid="dialogue-speaker"></strong>
+              <div data-testid="dialogue-text"></div>
+              <div class="button-stack" data-testid="dialogue-choices"></div>
+            </div>
+
             <div class="label">Combat</div>
             <div class="skill-line"><span>Health</span><strong data-testid="combat-health">— / —</strong></div>
             <div class="skill-line"><span>Combat level / XP</span><strong><span data-testid="combat-level">1</span> · <span data-testid="combat-xp">0</span></strong></div>
@@ -54,7 +77,6 @@ export class GlyphReachApp {
             <div class="button-stack"><button type="button" data-testid="attack-reach-rat">Attack Reach rat</button></div>
 
             <div class="label">Wallet</div><div class="skill-line"><span>Coins</span><strong data-testid="wallet-coins">0</strong></div>
-
             <div class="label">Mining</div><div class="skill-line"><span>Level / XP</span><strong><span data-testid="mining-level">1</span> · <span data-testid="mining-xp">0</span></strong></div>
             <div class="button-stack"><button type="button" data-testid="mine-focused">Focused mine</button><button type="button" data-testid="mine-steady">Steady mine · AFK</button><button type="button" class="button-muted" data-testid="mine-cancel">Cancel Mining</button></div>
 
@@ -97,9 +119,12 @@ export class GlyphReachApp {
       (state) => this.applyPlayerState(root, state),
       (state) => this.applyCombatWorldState(root, state),
       (state) => this.applyCombatPlayerState(root, state),
+      (state) => this.applyQuestState(root, state),
+      (state) => this.applyDialogueState(root, state),
       (message) => this.applyActionRejected(root, message),
     );
 
+    this.button(root, 'interact-surveyor', () => this.interactSurveyor());
     this.button(root, 'attack-reach-rat', () => this.attackReachRat());
     this.button(root, 'mine-focused', () => this.startMining('focused'));
     this.button(root, 'mine-steady', () => this.startMining('steady'));
@@ -123,6 +148,8 @@ export class GlyphReachApp {
       this.stations = welcome.stations;
       this.services = welcome.services;
       this.enemies = welcome.enemies;
+      this.npcs = welcome.npcs;
+      this.quests = welcome.quests;
       this.progress = welcome.progress;
       this.combat = welcome.combat;
       this.requireElement(root, '[data-testid="world-id"]').textContent = welcome.worldId;
@@ -132,6 +159,8 @@ export class GlyphReachApp {
       this.renderProgress(root);
       this.renderMerchantPrices(root);
       this.renderCombat(root);
+      this.renderQuest(root);
+      this.renderDialogue(root);
       await this.worldView.mount(this.requireElement(root, '[data-testid="world-canvas"]'), welcome, (target) => {
         if (this.connection?.moveTarget(target)) this.requireElement(root, '[data-testid="action-status"]').textContent = 'Moving to target…';
       });
@@ -142,7 +171,12 @@ export class GlyphReachApp {
     }
   }
 
-  destroy(): void { window.removeEventListener('keydown', this.onKeyDown); this.connection?.close(); this.worldView.destroy(); this.root = null; }
+  destroy(): void {
+    window.removeEventListener('keydown', this.onKeyDown);
+    this.connection?.close();
+    this.worldView.destroy();
+    this.root = null;
+  }
 
   private applyWorldState(root: HTMLElement, state: WorldStateMessage): void {
     this.resources = state.resources;
@@ -157,6 +191,7 @@ export class GlyphReachApp {
   private applyPlayerState(root: HTMLElement, state: PlayerStateMessage): void {
     this.progress = state.progress;
     this.renderProgress(root);
+    this.renderQuest(root);
   }
 
   private applyCombatWorldState(root: HTMLElement, state: CombatWorldStateMessage): void {
@@ -173,6 +208,16 @@ export class GlyphReachApp {
     if (state.combat.health.dead) this.requireElement(root, '[data-testid="action-status"]').textContent = 'You were defeated. Respawning at the safe point…';
   }
 
+  private applyQuestState(root: HTMLElement, state: QuestStateMessage): void {
+    this.quests = state.quests;
+    this.renderQuest(root);
+  }
+
+  private applyDialogueState(root: HTMLElement, state: DialogueStateMessage): void {
+    this.dialogue = state.dialogue;
+    this.renderDialogue(root);
+  }
+
   private applyActionRejected(root: HTMLElement, message: ActionRejectedMessage): void {
     const labels: Record<ActionRejectedMessage['reason'], string> = {
       invalid_target: 'That target or destination is not valid.',
@@ -184,7 +229,7 @@ export class GlyphReachApp {
       not_processing: 'There is no processing action to cancel.',
       invalid_recipe: 'That recipe is not available.',
       wrong_station: 'That recipe needs a different station.',
-      missing_items: 'You do not have the required materials.',
+      missing_items: 'You do not have the required materials or quest proof.',
       item_not_owned: 'You do not have enough of that item in your inventory.',
       invalid_equipment: 'That item cannot be equipped there.',
       invalid_service: 'That world service is not available.',
@@ -197,6 +242,11 @@ export class GlyphReachApp {
       target_dead: 'That enemy is already defeated.',
       player_dead: 'You cannot act until you respawn.',
       cooldown: 'Your next attack is not ready yet.',
+      invalid_npc: 'That NPC is not available.',
+      conversation_not_open: 'Talk to that NPC before choosing a response.',
+      invalid_choice: 'That response is not valid for the current conversation.',
+      quest_not_ready: 'The quest objectives are not ready to turn in yet.',
+      quest_already_completed: 'That quest has already been completed and rewarded.',
     };
     this.requireElement(root, '[data-testid="action-status"]').textContent = labels[message.reason];
   }
@@ -205,6 +255,42 @@ export class GlyphReachApp {
     this.requireElement(root, '[data-testid="player-count"]').textContent = String(players.length);
     const local = players.find((player) => player.id === this.localPlayerId);
     if (local) this.requireElement(root, '[data-testid="local-position"]').textContent = `${Math.round(local.position.x)}, ${Math.round(local.position.y)}`;
+  }
+
+  private renderQuest(root: HTMLElement): void {
+    const quest = this.quests.find((candidate) => candidate.questId === 'first-fieldwork-alpha');
+    if (!quest) return;
+    this.requireElement(root, '[data-testid="quest-title"]').textContent = quest.title;
+    this.requireElement(root, '[data-testid="quest-status"]').textContent = quest.status === 'completed'
+      ? 'Completed'
+      : quest.status === 'active'
+        ? (quest.stage === 'return' ? 'Return to Surveyor' : 'Active')
+        : 'Available';
+    const objective = (id: string) => quest.objectives.find((candidate) => candidate.id === id)?.complete ?? false;
+    this.requireElement(root, '[data-testid="quest-mine-status"]').textContent = objective('mine_copper') ? 'Done' : 'Pending';
+    this.requireElement(root, '[data-testid="quest-rat-status"]').textContent = objective('defeat_rat') ? 'Done' : 'Pending';
+    this.requireElement(root, '[data-testid="quest-proof-status"]').textContent = objective('bring_proof') ? 'Ready' : 'Pending';
+  }
+
+  private renderDialogue(root: HTMLElement): void {
+    const panel = this.requireElement(root, '[data-testid="dialogue-panel"]');
+    const choices = this.requireElement(root, '[data-testid="dialogue-choices"]');
+    if (!this.dialogue) {
+      panel.hidden = true;
+      choices.replaceChildren();
+      return;
+    }
+    panel.hidden = false;
+    this.requireElement(root, '[data-testid="dialogue-speaker"]').textContent = this.dialogue.speaker;
+    this.requireElement(root, '[data-testid="dialogue-text"]').textContent = this.dialogue.text;
+    choices.replaceChildren(...this.dialogue.choices.map((choice) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = choice.label;
+      button.dataset.testid = `dialogue-choice-${choice.id}`;
+      button.addEventListener('click', () => this.chooseDialogue(choice.id));
+      return button;
+    }));
   }
 
   private renderProgress(root: HTMLElement): void {
@@ -227,7 +313,9 @@ export class GlyphReachApp {
     if (progress.processing) {
       const label = progress.processing.recipeId === 'smelt_copper'
         ? 'Smelting copper…'
-        : progress.processing.recipeId === 'smith_copper_sword' ? 'Smithing copper sword…' : 'Smithing copper pickaxe…';
+        : progress.processing.recipeId === 'smith_copper_sword'
+          ? 'Smithing copper sword…'
+          : 'Smithing copper pickaxe…';
       this.requireElement(root, '[data-testid="action-status"]').textContent = label;
     } else if (progress.gathering) {
       this.requireElement(root, '[data-testid="action-status"]').textContent = progress.gathering.mode === 'steady' ? 'Steady Mining active · continues automatically.' : 'Focused Mining…';
@@ -257,6 +345,17 @@ export class GlyphReachApp {
     return slots.filter((slot) => slot.itemId === itemId).reduce((total, slot) => total + slot.quantity, 0);
   }
 
+  private interactSurveyor(): void {
+    const npc = this.npcs.find((candidate) => candidate.id === 'surveyor-alpha-1');
+    if (!npc || !this.connection || !this.root) return;
+    if (this.connection.interactNpc(npc.id)) this.requireElement(this.root, '[data-testid="action-status"]').textContent = 'Talking to Surveyor Rhea…';
+  }
+
+  private chooseDialogue(choiceId: string): void {
+    if (!this.dialogue || !this.connection || !this.root) return;
+    if (this.connection.dialogueChoice(this.dialogue.npcId, choiceId)) this.requireElement(this.root, '[data-testid="action-status"]').textContent = 'Sending response…';
+  }
+
   private attackReachRat(): void {
     const rat = this.enemies.find((enemy) => enemy.kind === 'reach_rat');
     if (!rat || !this.connection || !this.root) return;
@@ -273,8 +372,11 @@ export class GlyphReachApp {
     const station = this.stations.find((candidate) => candidate.kind === kind);
     if (!station || !this.connection || !this.root) return;
     if (this.connection.startProcessing(station.id, recipeId)) {
-      const label = recipeId === 'smelt_copper' ? 'Starting smelt…' : recipeId === 'smith_copper_sword' ? 'Starting sword smithing…' : 'Starting pickaxe smithing…';
-      this.requireElement(this.root, '[data-testid="action-status"]').textContent = label;
+      this.requireElement(this.root, '[data-testid="action-status"]').textContent = recipeId === 'smelt_copper'
+        ? 'Starting smelt…'
+        : recipeId === 'smith_copper_sword'
+          ? 'Starting sword smithing…'
+          : 'Starting pickaxe smithing…';
     }
   }
 
@@ -303,21 +405,43 @@ export class GlyphReachApp {
   private updateConnectionStatus(root: HTMLElement, state: ConnectionState, detail?: string): void {
     const element = this.requireElement(root, '[data-testid="connection-status"]');
     element.dataset.state = state;
-    const labels: Record<ConnectionState, string> = { connecting: 'Connecting…', connected: 'Connected', rejected: 'Rejected', disconnected: 'Disconnected', error: 'Connection error' };
+    const labels: Record<ConnectionState, string> = {
+      connecting: 'Connecting…',
+      connected: 'Connected',
+      rejected: 'Rejected',
+      disconnected: 'Disconnected',
+      error: 'Connection error',
+    };
     element.textContent = detail ? `${labels[state]} · ${detail}` : labels[state];
   }
 
-  private button(root: HTMLElement, testId: string, handler: () => void): void { this.requireElement(root, `[data-testid="${testId}"]`).addEventListener('click', handler); }
-  private requireElement(root: HTMLElement, selector: string): HTMLElement { const element = root.querySelector<HTMLElement>(selector); if (!element) throw new Error(`Missing app element: ${selector}`); return element; }
+  private button(root: HTMLElement, testId: string, handler: () => void): void {
+    this.requireElement(root, `[data-testid="${testId}"]`).addEventListener('click', handler);
+  }
+
+  private requireElement(root: HTMLElement, selector: string): HTMLElement {
+    const element = root.querySelector<HTMLElement>(selector);
+    if (!element) throw new Error(`Missing app element: ${selector}`);
+    return element;
+  }
 }
 
 function directionForKey(key: string): { dx: -1 | 0 | 1; dy: -1 | 0 | 1 } | null {
   switch (key.toLowerCase()) {
-    case 'a': case 'arrowleft': return { dx: -1, dy: 0 };
-    case 'd': case 'arrowright': return { dx: 1, dy: 0 };
-    case 'w': case 'arrowup': return { dx: 0, dy: -1 };
-    case 's': case 'arrowdown': return { dx: 0, dy: 1 };
+    case 'a':
+    case 'arrowleft': return { dx: -1, dy: 0 };
+    case 'd':
+    case 'arrowright': return { dx: 1, dy: 0 };
+    case 'w':
+    case 'arrowup': return { dx: 0, dy: -1 };
+    case 's':
+    case 'arrowdown': return { dx: 0, dy: 1 };
     default: return null;
   }
 }
-function escapeHtml(value: string): string { const div = document.createElement('div'); div.textContent = value; return div.innerHTML; }
+
+function escapeHtml(value: string): string {
+  const div = document.createElement('div');
+  div.textContent = value;
+  return div.innerHTML;
+}

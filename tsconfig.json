@@ -13,5 +13,13 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src", "test", "vite.config.ts", "playwright.config.ts"]
+  "include": [
+    "src/net",
+    "src/protocol",
+    "src/world",
+    "test/*.test.ts",
+    "test/support",
+    "vite.config.ts",
+    "playwright.config.ts"
+  ]
 }
