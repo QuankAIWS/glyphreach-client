@@ -1,6 +1,7 @@
 import type { EnemySnapshot, PlayerProgressSnapshot } from '../protocol/v1';
 import type { QuestJournalSnapshot } from '../protocol/quest-v1';
 import type { GlyphReachApp } from './App';
+import { addNorthreachMap } from './m9-map';
 
 type ChapterApp = { enemies: EnemySnapshot[]; quests: QuestJournalSnapshot[]; progress: PlayerProgressSnapshot | null };
 
@@ -14,7 +15,18 @@ export function startNorthreachSync(root: HTMLElement, app: GlyphReachApp): void
 }
 
 function render(root: HTMLElement, state: ChapterApp): void {
+  addNorthreachMap(root);
   const quest = state.quests.find((item) => item.questId === 'stone-below-alpha');
+  const visible = Boolean(quest);
+  const panel = root.querySelector<HTMLElement>('[data-testid="stone-quest-panel"]');
+  const overlay = root.querySelector<HTMLElement>('[data-testid="northreach-overlay"]');
+  const wardenHealth = root.querySelector<HTMLElement>('[data-testid="warden-health"]');
+  const wardenButton = root.querySelector<HTMLButtonElement>('[data-testid="attack-waystone-warden"]');
+  if (panel) panel.hidden = !visible;
+  if (overlay) overlay.hidden = !visible;
+  if (wardenHealth?.parentElement) wardenHealth.parentElement.hidden = !visible;
+  if (wardenButton) wardenButton.hidden = !visible;
+
   set(root, 'stone-quest-title', quest?.title ?? 'The Stone Below');
   set(root, 'stone-quest-status', quest ? status(quest) : 'Locked');
   set(root, 'stone-quest-vault-status', objective(quest, 'find_vault'));
@@ -23,6 +35,7 @@ function render(root: HTMLElement, state: ChapterApp): void {
   set(root, 'stone-quest-proof-status', objective(quest, 'bring_core', 'Ready'));
   const warden = state.enemies.find((enemy) => enemy.id === 'waystone-warden-alpha-1');
   set(root, 'warden-health', !warden ? 'Sealed' : warden.alive ? `${warden.health} / ${warden.maxHealth}` : 'Defeated');
+  if (wardenButton) wardenButton.disabled = !warden?.alive;
   const slots = state.progress?.inventory.slots ?? [];
   set(root, 'warden-core-count', String(count(slots, 'warden_core')));
   set(root, 'old-route-token-count', String(count(slots, 'old_route_token')));
@@ -30,7 +43,7 @@ function render(root: HTMLElement, state: ChapterApp): void {
 
 function addInventoryRows(root: HTMLElement): void {
   const anchor = root.querySelector('[data-testid="waystone-fragment-count"]')?.closest('.skill-line');
-  if (!anchor) return;
+  if (!anchor || root.querySelector('[data-testid="warden-core-count"]')) return;
   anchor.after(row('Waystone Warden core', 'warden-core-count'), row('Old Northreach route token', 'old-route-token-count'));
 }
 function row(label: string, id: string): HTMLElement {
