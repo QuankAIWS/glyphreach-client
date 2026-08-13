@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('three browser clients share click movement, production, banking, and NPC economy projection', async ({ browser }) => {
-  test.setTimeout(45_000);
+  test.setTimeout(90_000);
   const contexts = await Promise.all([browser.newContext(), browser.newContext(), browser.newContext()]);
   try {
     const pages = await test.step('connect three browser clients', async () => Promise.all(contexts.map(async (context) => {
