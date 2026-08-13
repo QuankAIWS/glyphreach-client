@@ -4,9 +4,22 @@ import { WebSocket, WebSocketServer } from 'ws';
 
 const port = Number(process.env.MOCK_BACKEND_PORT ?? 8787);
 const bounds = { minX: 0, minY: 0, maxX: 1000, maxY: 600 };
+const resource = {
+  id: 'copper-vein-alpha-1',
+  kind: 'copper_vein',
+  position: { x: 760, y: 300 },
+  available: true,
+  respawnAt: null as number | null,
+};
 let revision = 0;
 let playerNumber = 0;
-const players = new Map<WebSocket, { id: string; resumeToken: string; position: { x: number; y: number } }>();
+const players = new Map<WebSocket, {
+  id: string;
+  resumeToken: string;
+  position: { x: number; y: number };
+  progressRevision: number;
+  progress: ReturnType<typeof emptyProgress>;
+}>();
 
 const server = createServer((request, response) => {
   if (request.url === '/healthz') {
@@ -43,6 +56,8 @@ wss.on('connection', (socket) => {
       id: `test-player-${playerNumber}`,
       resumeToken: randomUUID(),
       position: { x: 380 + playerNumber * 80, y: 300 },
+      progressRevision: 0,
+      progress: emptyProgress(),
     };
     players.set(socket, player);
     revision += 1;
@@ -56,6 +71,8 @@ wss.on('connection', (socket) => {
       worldId: 'alpha-1',
       player: snapshot(player),
       players: snapshots(),
+      resources: resources(),
+      progress: player.progress,
       world: { bounds },
     }), () => broadcast());
 
@@ -64,15 +81,72 @@ wss.on('connection', (socket) => {
       let value: unknown;
       try { value = JSON.parse(nextData.toString()); } catch { return; }
       const message = value && typeof value === 'object' ? value as Record<string, unknown> : null;
-      if (!message || message.type !== 'MOVE_INTENT') return;
-      const dx = Number(message.dx);
-      const dy = Number(message.dy);
-      if (![-1, 0, 1].includes(dx) || ![-1, 0, 1].includes(dy) || (dx === 0 && dy === 0)) return;
-      const magnitude = Math.hypot(dx, dy);
-      player.position.x = clamp(player.position.x + (dx / magnitude) * 28, bounds.minX, bounds.maxX);
-      player.position.y = clamp(player.position.y + (dy / magnitude) * 28, bounds.minY, bounds.maxY);
-      revision += 1;
-      broadcast();
+      if (!message) return;
+
+      if (message.type === 'MOVE_INTENT') {
+        const dx = Number(message.dx);
+        const dy = Number(message.dy);
+        if (![-1, 0, 1].includes(dx) || ![-1, 0, 1].includes(dy) || (dx === 0 && dy === 0)) return;
+        const magnitude = Math.hypot(dx, dy);
+        player.position.x = clamp(player.position.x + (dx / magnitude) * 28, bounds.minX, bounds.maxX);
+        player.position.y = clamp(player.position.y + (dy / magnitude) * 28, bounds.minY, bounds.maxY);
+        revision += 1;
+        broadcast();
+        return;
+      }
+
+      if (message.type === 'MOVE_TARGET') {
+        const target = message.target as { x?: unknown; y?: unknown } | undefined;
+        if (!target || typeof target.x !== 'number' || typeof target.y !== 'number') return;
+        if (target.x < bounds.minX || target.x > bounds.maxX || target.y < bounds.minY || target.y > bounds.maxY) {
+          socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action: 'movement', reason: 'invalid_target' }));
+          return;
+        }
+        player.position = { x: target.x, y: target.y };
+        revision += 1;
+        broadcast();
+        return;
+      }
+
+      if (message.type === 'START_GATHERING') {
+        const mode = message.mode === 'steady' ? 'steady' : 'focused';
+        if (Math.hypot(player.position.x - resource.position.x, player.position.y - resource.position.y) > 86) {
+          socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action: 'gathering', reason: 'too_far' }));
+          return;
+        }
+        if (!resource.available) {
+          socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action: 'gathering', reason: 'node_unavailable' }));
+          return;
+        }
+        const now = Date.now();
+        player.progress.gathering = { nodeId: resource.id, mode, startedAt: now, completesAt: now + 120 };
+        sendPlayerState(socket, player);
+        setTimeout(() => {
+          if (!players.has(socket) || !resource.available) return;
+          resource.available = false;
+          resource.respawnAt = Date.now() + 160;
+          const slot = player.progress.inventory.slots.length;
+          player.progress.inventory.slots.push({ slot, itemId: 'copper_ore', quantity: 1 });
+          player.progress.skills.mining.xp += mode === 'steady' ? 7 : 12;
+          player.progress.skills.mining.level = 1 + Math.floor(Math.sqrt(player.progress.skills.mining.xp / 20));
+          player.progress.gathering = null;
+          sendPlayerState(socket, player);
+          revision += 1;
+          broadcast();
+          setTimeout(() => {
+            resource.available = true;
+            resource.respawnAt = null;
+            revision += 1;
+            broadcast();
+          }, 160);
+        }, 120);
+        return;
+      }
+
+      if (message.type === 'CANCEL_GATHERING') {
+        player.progress.gathering = null;
+        sendPlayerState(socket, player);
+      }
     });
   });
 
@@ -83,6 +157,14 @@ wss.on('connection', (socket) => {
   });
 });
 
+function emptyProgress() {
+  return {
+    inventory: { capacity: 24, slots: [] as Array<{ slot: number; itemId: string; quantity: number }> },
+    skills: { mining: { xp: 0, level: 1 } },
+    gathering: null as null | { nodeId: string; mode: 'focused' | 'steady'; startedAt: number; completesAt: number },
+  };
+}
+
 function snapshot(player: { id: string; position: { x: number; y: number } }) {
   return { id: player.id, position: { ...player.position } };
 }
@@ -91,8 +173,17 @@ function snapshots() {
   return [...players.values()].map(snapshot).sort((a, b) => a.id.localeCompare(b.id));
 }
 
+function resources() {
+  return [{ ...resource, position: { ...resource.position } }];
+}
+
+function sendPlayerState(socket: WebSocket, player: { progressRevision: number; progress: ReturnType<typeof emptyProgress> }) {
+  player.progressRevision += 1;
+  socket.send(JSON.stringify({ type: 'PLAYER_STATE', revision: player.progressRevision, progress: player.progress }));
+}
+
 function broadcast() {
-  const payload = JSON.stringify({ type: 'WORLD_STATE', revision, players: snapshots() });
+  const payload = JSON.stringify({ type: 'WORLD_STATE', revision, players: snapshots(), resources: resources() });
   for (const socket of players.keys()) {
     if (socket.readyState === WebSocket.OPEN) socket.send(payload);
   }

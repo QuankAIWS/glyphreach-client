@@ -1,7 +1,14 @@
 import {
+  createCancelGathering,
   createHello,
   createMoveIntent,
+  createMoveTarget,
+  createStartGathering,
   parseServerMessage,
+  type ActionRejectedMessage,
+  type GatheringMode,
+  type PlayerStateMessage,
+  type Position,
   type WelcomeMessage,
   type WorldStateMessage,
 } from '../protocol/v1';
@@ -17,6 +24,8 @@ export class WorldConnection {
     private readonly clientBuild: string,
     private readonly onState: (state: ConnectionState, detail?: string) => void,
     private readonly onWorldState: (state: WorldStateMessage) => void,
+    private readonly onPlayerState: (state: PlayerStateMessage) => void,
+    private readonly onActionRejected: (message: ActionRejectedMessage) => void,
   ) {}
 
   connect(resumeToken?: string, timeoutMs = 5_000): Promise<WelcomeMessage> {
@@ -71,7 +80,10 @@ export class WorldConnection {
             return;
           }
 
-          if (settled) this.onWorldState(message);
+          if (!settled) return;
+          if (message.type === 'WORLD_STATE') this.onWorldState(message);
+          else if (message.type === 'PLAYER_STATE') this.onPlayerState(message);
+          else this.onActionRejected(message);
         } catch (error) {
           socket.close(1002, 'invalid server message');
           if (!settled) {
@@ -97,14 +109,31 @@ export class WorldConnection {
   }
 
   move(dx: -1 | 0 | 1, dy: -1 | 0 | 1): boolean {
-    const socket = this.socket;
-    if (!socket || socket.readyState !== WebSocket.OPEN || (dx === 0 && dy === 0)) return false;
-    socket.send(JSON.stringify(createMoveIntent(this.sequence++, dx, dy)));
-    return true;
+    if (dx === 0 && dy === 0) return false;
+    return this.send(createMoveIntent(this.sequence++, dx, dy));
+  }
+
+  moveTarget(target: Position): boolean {
+    return this.send(createMoveTarget(this.sequence++, target));
+  }
+
+  startGathering(nodeId: string, mode: GatheringMode): boolean {
+    return this.send(createStartGathering(this.sequence++, nodeId, mode));
+  }
+
+  cancelGathering(): boolean {
+    return this.send(createCancelGathering(this.sequence++));
   }
 
   close(): void {
     this.socket?.close(1000, 'client shutdown');
     this.socket = null;
+  }
+
+  private send(message: object): boolean {
+    const socket = this.socket;
+    if (!socket || socket.readyState !== WebSocket.OPEN) return false;
+    socket.send(JSON.stringify(message));
+    return true;
   }
 }

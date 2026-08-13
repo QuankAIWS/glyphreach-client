@@ -3,53 +3,59 @@ import test from 'node:test';
 import {
   PROTOCOL_VERSION,
   createHello,
-  createMoveIntent,
+  createMoveTarget,
+  createStartGathering,
   parseServerMessage,
 } from '../src/protocol/v1';
 
-test('HELLO can carry the development resume token without changing protocol version', () => {
-  const resumeToken = '123e4567-e89b-42d3-a456-426614174000';
-  assert.deepEqual(createHello('client-sha', resumeToken), {
+test('HELLO is pinned to the public protocol version', () => {
+  assert.deepEqual(createHello('client-sha'), {
     type: 'HELLO',
     protocolVersion: PROTOCOL_VERSION,
     clientBuild: 'client-sha',
-    resumeToken,
   });
 });
 
-test('MOVE_INTENT expresses direction rather than authoritative coordinates', () => {
-  assert.deepEqual(createMoveIntent(4, 1, 0), {
-    type: 'MOVE_INTENT',
+test('click movement and Mining are expressed as intent rather than authoritative results', () => {
+  assert.deepEqual(createMoveTarget(4, { x: 700, y: 300 }), {
+    type: 'MOVE_TARGET',
     sequence: 4,
-    dx: 1,
-    dy: 0,
+    target: { x: 700, y: 300 },
+  });
+  assert.deepEqual(createStartGathering(5, 'copper-vein-alpha-1', 'steady'), {
+    type: 'START_GATHERING',
+    sequence: 5,
+    nodeId: 'copper-vein-alpha-1',
+    mode: 'steady',
   });
 });
 
-test('WELCOME and WORLD_STATE parsing accept authoritative multiplayer snapshots', () => {
-  const player = { id: 'player-1', position: { x: 500, y: 300 } };
-  const welcome = parseServerMessage(JSON.stringify({
+test('WELCOME parsing accepts authoritative world, resource, inventory, and skill state', () => {
+  const message = parseServerMessage(JSON.stringify({
     type: 'WELCOME',
     protocolVersion: 1,
     serverBuild: 'server-sha',
     connectionId: 'connection-1',
-    resumeToken: '123e4567-e89b-42d3-a456-426614174000',
+    resumeToken: 'token-1',
     worldId: 'alpha-1',
-    player,
-    players: [player],
+    player: { id: 'player-1', position: { x: 500, y: 300 } },
+    players: [{ id: 'player-1', position: { x: 500, y: 300 } }],
+    resources: [{ id: 'copper-vein-alpha-1', kind: 'copper_vein', position: { x: 760, y: 300 }, available: true, respawnAt: null }],
+    progress: {
+      inventory: { capacity: 24, slots: [] },
+      skills: { mining: { xp: 0, level: 1 } },
+      gathering: null,
+    },
     world: { bounds: { minX: 0, minY: 0, maxX: 1000, maxY: 600 } },
   }));
-  assert.equal(welcome.type, 'WELCOME');
-
-  const state = parseServerMessage(JSON.stringify({
-    type: 'WORLD_STATE',
-    revision: 7,
-    players: [player, { id: 'player-2', position: { x: 600, y: 300 } }],
-  }));
-  assert.equal(state.type, 'WORLD_STATE');
-  if (state.type === 'WORLD_STATE') assert.equal(state.players.length, 2);
+  assert.equal(message.type, 'WELCOME');
+  if (message.type === 'WELCOME') {
+    assert.equal(message.player.id, 'player-1');
+    assert.equal(message.resources[0]?.kind, 'copper_vein');
+    assert.equal(message.progress.skills.mining.level, 1);
+  }
 });
 
 test('malformed server messages are rejected', () => {
-  assert.throws(() => parseServerMessage('{"type":"WORLD_STATE","revision":1}'), /Malformed WORLD_STATE/);
+  assert.throws(() => parseServerMessage('{"type":"WELCOME"}'), /Malformed WELCOME/);
 });

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('three browser clients share presence and movement projection', async ({ browser }) => {
+test('three browser clients share click movement and the first Mining loop', async ({ browser }) => {
   const contexts = await Promise.all([
     browser.newContext(),
     browser.newContext(),
@@ -22,12 +22,21 @@ test('three browser clients share presence and movement projection', async ({ br
     const thirdId = await pages[2].getByTestId('player-id').textContent();
     expect(new Set([firstId, secondId, thirdId]).size).toBe(3);
 
-    const before = Number(await pages[1].getByTestId('world-revision').textContent());
-    await pages[0].keyboard.press('ArrowRight');
-    await expect.poll(async () => Number(await pages[1].getByTestId('world-revision').textContent())).toBeGreaterThan(before);
-    await expect(pages[0].getByTestId('local-position')).not.toHaveText('—');
+    const beforePosition = await pages[0].getByTestId('local-position').textContent();
+    const beforeRevision = Number(await pages[1].getByTestId('world-revision').textContent());
+    const canvas = pages[0].locator('canvas[aria-label="GlyphReach world"]');
+    const box = await canvas.boundingBox();
+    expect(box).not.toBeNull();
+    await canvas.click({ position: { x: box!.width * 0.74, y: box!.height * 0.5 } });
+    await expect(pages[0].getByTestId('local-position')).not.toHaveText(beforePosition ?? '');
+    await expect.poll(async () => Number(await pages[1].getByTestId('world-revision').textContent())).toBeGreaterThan(beforeRevision);
 
-    await pages[0].screenshot({ path: 'test-results/three-players-walking.png', fullPage: true });
+    await pages[0].getByTestId('mine-focused').click();
+    await expect(pages[0].getByTestId('copper-ore-count')).toHaveText('1');
+    await expect(pages[0].getByTestId('mining-xp')).toHaveText('12');
+    await expect(pages[0].getByTestId('inventory-slots')).toHaveText('1 / 24');
+
+    await pages[0].screenshot({ path: 'test-results/click-move-first-mining.png', fullPage: true });
   } finally {
     await Promise.all(contexts.map((context) => context.close()));
   }
