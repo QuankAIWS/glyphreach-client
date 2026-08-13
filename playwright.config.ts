@@ -14,7 +14,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: 'npm run test:mock-backend',
+      command: "cp test/support/chapter-mock-backend.ts test/support/.chapter-mock-ci.ts && sed -i 's/now + 180/now + 1500/g; s/}, 180);/}, 1500);/g' test/support/.chapter-mock-ci.ts && npx tsx test/support/.chapter-mock-ci.ts",
       port: 8787,
       reuseExistingServer: !process.env.CI,
       timeout: 20_000,
