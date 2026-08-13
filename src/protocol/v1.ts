@@ -26,6 +26,20 @@ export interface PlayerProgressSnapshot {
   gathering: GatheringSnapshot | null;
   processing: ProcessingSnapshot | null;
 }
+export interface EnemySnapshot {
+  id: string;
+  kind: 'reach_rat';
+  position: Position;
+  health: number;
+  maxHealth: number;
+  alive: boolean;
+  respawnAt: number | null;
+}
+export interface CombatProgressSnapshot {
+  health: { current: number; max: number; dead: boolean; respawnAt: number | null };
+  skill: SkillSnapshot;
+  equipment: { weaponItemId: string | null };
+}
 
 export interface HelloMessage { type: 'HELLO'; protocolVersion: typeof PROTOCOL_VERSION; clientBuild: string; resumeToken?: string; }
 export interface MoveIntentMessage { type: 'MOVE_INTENT'; sequence: number; dx: -1 | 0 | 1; dy: -1 | 0 | 1; }
@@ -39,6 +53,7 @@ export interface BankDepositMessage { type: 'BANK_DEPOSIT'; sequence: number; se
 export interface BankWithdrawMessage { type: 'BANK_WITHDRAW'; sequence: number; serviceId: string; itemId: string; quantity: number; }
 export interface MerchantBuyMessage { type: 'MERCHANT_BUY'; sequence: number; serviceId: string; itemId: string; quantity: number; }
 export interface MerchantSellMessage { type: 'MERCHANT_SELL'; sequence: number; serviceId: string; itemId: string; quantity: number; }
+export interface AttackTargetMessage { type: 'ATTACK_TARGET'; sequence: number; targetId: string; }
 
 export interface WelcomeMessage {
   type: 'WELCOME';
@@ -53,17 +68,21 @@ export interface WelcomeMessage {
   stations: StationSnapshot[];
   services: ServiceSnapshot[];
   progress: PlayerProgressSnapshot;
+  enemies: EnemySnapshot[];
+  combat: CombatProgressSnapshot;
   world: { bounds: WorldBounds };
 }
 export interface WorldStateMessage { type: 'WORLD_STATE'; revision: number; players: PlayerSnapshot[]; resources: ResourceNodeSnapshot[]; stations: StationSnapshot[]; services: ServiceSnapshot[]; }
 export interface PlayerStateMessage { type: 'PLAYER_STATE'; revision: number; progress: PlayerProgressSnapshot; }
+export interface CombatWorldStateMessage { type: 'COMBAT_WORLD_STATE'; revision: number; enemies: EnemySnapshot[]; }
+export interface CombatPlayerStateMessage { type: 'COMBAT_PLAYER_STATE'; revision: number; combat: CombatProgressSnapshot; }
 export interface ActionRejectedMessage {
   type: 'ACTION_REJECTED';
-  action: 'movement' | 'gathering' | 'processing' | 'equipment' | 'bank' | 'merchant';
-  reason: 'invalid_target' | 'too_far' | 'node_unavailable' | 'inventory_full' | 'already_busy' | 'not_gathering' | 'not_processing' | 'invalid_recipe' | 'wrong_station' | 'missing_items' | 'item_not_owned' | 'invalid_equipment' | 'invalid_service' | 'invalid_quantity' | 'bank_full' | 'bank_missing_item' | 'insufficient_coins' | 'item_not_traded' | 'transaction_failed';
+  action: 'movement' | 'gathering' | 'processing' | 'equipment' | 'bank' | 'merchant' | 'combat';
+  reason: 'invalid_target' | 'too_far' | 'node_unavailable' | 'inventory_full' | 'already_busy' | 'not_gathering' | 'not_processing' | 'invalid_recipe' | 'wrong_station' | 'missing_items' | 'item_not_owned' | 'invalid_equipment' | 'invalid_service' | 'invalid_quantity' | 'bank_full' | 'bank_missing_item' | 'insufficient_coins' | 'item_not_traded' | 'transaction_failed' | 'target_dead' | 'player_dead' | 'cooldown';
 }
 export interface RejectMessage { type: 'REJECT'; reason: 'protocol_mismatch' | 'invalid_message'; supportedProtocolVersion: typeof PROTOCOL_VERSION; }
-export type ServerMessage = WelcomeMessage | WorldStateMessage | PlayerStateMessage | ActionRejectedMessage | RejectMessage;
+export type ServerMessage = WelcomeMessage | WorldStateMessage | PlayerStateMessage | CombatWorldStateMessage | CombatPlayerStateMessage | ActionRejectedMessage | RejectMessage;
 
 export function createHello(clientBuild: string, resumeToken?: string): HelloMessage { return { type: 'HELLO', protocolVersion: PROTOCOL_VERSION, clientBuild, ...(resumeToken ? { resumeToken } : {}) }; }
 export function createMoveIntent(sequence: number, dx: -1 | 0 | 1, dy: -1 | 0 | 1): MoveIntentMessage { return { type: 'MOVE_INTENT', sequence, dx, dy }; }
@@ -77,6 +96,7 @@ export function createBankDeposit(sequence: number, serviceId: string, itemId: s
 export function createBankWithdraw(sequence: number, serviceId: string, itemId: string, quantity: number): BankWithdrawMessage { return { type: 'BANK_WITHDRAW', sequence, serviceId, itemId, quantity }; }
 export function createMerchantBuy(sequence: number, serviceId: string, itemId: string, quantity: number): MerchantBuyMessage { return { type: 'MERCHANT_BUY', sequence, serviceId, itemId, quantity }; }
 export function createMerchantSell(sequence: number, serviceId: string, itemId: string, quantity: number): MerchantSellMessage { return { type: 'MERCHANT_SELL', sequence, serviceId, itemId, quantity }; }
+export function createAttackTarget(sequence: number, targetId: string): AttackTargetMessage { return { type: 'ATTACK_TARGET', sequence, targetId }; }
 
 export function parseServerMessage(raw: string): ServerMessage {
   let value: unknown;
@@ -88,8 +108,8 @@ export function parseServerMessage(raw: string): ServerMessage {
     return value as unknown as RejectMessage;
   }
   if (value.type === 'ACTION_REJECTED') {
-    const actions = ['movement', 'gathering', 'processing', 'equipment', 'bank', 'merchant'];
-    const reasons = ['invalid_target', 'too_far', 'node_unavailable', 'inventory_full', 'already_busy', 'not_gathering', 'not_processing', 'invalid_recipe', 'wrong_station', 'missing_items', 'item_not_owned', 'invalid_equipment', 'invalid_service', 'invalid_quantity', 'bank_full', 'bank_missing_item', 'insufficient_coins', 'item_not_traded', 'transaction_failed'];
+    const actions = ['movement', 'gathering', 'processing', 'equipment', 'bank', 'merchant', 'combat'];
+    const reasons = ['invalid_target', 'too_far', 'node_unavailable', 'inventory_full', 'already_busy', 'not_gathering', 'not_processing', 'invalid_recipe', 'wrong_station', 'missing_items', 'item_not_owned', 'invalid_equipment', 'invalid_service', 'invalid_quantity', 'bank_full', 'bank_missing_item', 'insufficient_coins', 'item_not_traded', 'transaction_failed', 'target_dead', 'player_dead', 'cooldown'];
     if (!actions.includes(String(value.action)) || !reasons.includes(String(value.reason))) throw new Error('Malformed ACTION_REJECTED message');
     return value as unknown as ActionRejectedMessage;
   }
@@ -97,16 +117,24 @@ export function parseServerMessage(raw: string): ServerMessage {
     if (!Number.isSafeInteger(value.revision) || !isProgress(value.progress)) throw new Error('Malformed PLAYER_STATE message');
     return value as unknown as PlayerStateMessage;
   }
+  if (value.type === 'COMBAT_PLAYER_STATE') {
+    if (!Number.isSafeInteger(value.revision) || !isCombatProgress(value.combat)) throw new Error('Malformed COMBAT_PLAYER_STATE message');
+    return value as unknown as CombatPlayerStateMessage;
+  }
   if (value.type === 'WORLD_STATE') {
     if (!Number.isSafeInteger(value.revision) || !isPlayers(value.players) || !isResources(value.resources) || !isStations(value.stations) || !isServices(value.services)) throw new Error('Malformed WORLD_STATE message');
     return value as unknown as WorldStateMessage;
+  }
+  if (value.type === 'COMBAT_WORLD_STATE') {
+    if (!Number.isSafeInteger(value.revision) || !isEnemies(value.enemies)) throw new Error('Malformed COMBAT_WORLD_STATE message');
+    return value as unknown as CombatWorldStateMessage;
   }
   if (value.type !== 'WELCOME') throw new Error(`Unknown server message type: ${value.type}`);
   if (
     value.protocolVersion !== PROTOCOL_VERSION || typeof value.serverBuild !== 'string' ||
     typeof value.connectionId !== 'string' || typeof value.resumeToken !== 'string' || typeof value.worldId !== 'string' ||
     !isPlayer(value.player) || !isPlayers(value.players) || !isResources(value.resources) || !isStations(value.stations) || !isServices(value.services) ||
-    !isProgress(value.progress) || !isRecord(value.world) || !isBounds(value.world.bounds)
+    !isProgress(value.progress) || !isEnemies(value.enemies) || !isCombatProgress(value.combat) || !isRecord(value.world) || !isBounds(value.world.bounds)
   ) throw new Error('Malformed WELCOME message');
   return value as unknown as WelcomeMessage;
 }
@@ -135,6 +163,19 @@ function isProgress(value: unknown): value is PlayerProgressSnapshot {
   if (!isSkill(value.skills.mining) || !isSkill(value.skills.smithing)) return false;
   if (!(value.gathering === null || isGathering(value.gathering))) return false;
   return value.processing === null || isProcessing(value.processing);
+}
+function isEnemy(value: unknown): value is EnemySnapshot {
+  return isRecord(value) && typeof value.id === 'string' && value.kind === 'reach_rat' && isPosition(value.position) &&
+    Number.isSafeInteger(value.health) && (value.health as number) >= 0 && Number.isSafeInteger(value.maxHealth) && (value.maxHealth as number) > 0 &&
+    typeof value.alive === 'boolean' && (value.respawnAt === null || typeof value.respawnAt === 'number');
+}
+function isEnemies(value: unknown): value is EnemySnapshot[] { return Array.isArray(value) && value.every(isEnemy); }
+function isCombatProgress(value: unknown): value is CombatProgressSnapshot {
+  if (!isRecord(value) || !isRecord(value.health) || !isRecord(value.equipment)) return false;
+  if (!Number.isSafeInteger(value.health.current) || (value.health.current as number) < 0 || !Number.isSafeInteger(value.health.max) || (value.health.max as number) <= 0) return false;
+  if (typeof value.health.dead !== 'boolean' || !(value.health.respawnAt === null || typeof value.health.respawnAt === 'number')) return false;
+  if (!isSkill(value.skill)) return false;
+  return value.equipment.weaponItemId === null || typeof value.equipment.weaponItemId === 'string';
 }
 function isInventorySlot(value: unknown): value is InventorySlotSnapshot { return isRecord(value) && Number.isSafeInteger(value.slot) && typeof value.itemId === 'string' && Number.isSafeInteger(value.quantity) && (value.quantity as number) > 0; }
 function isSkill(value: unknown): value is SkillSnapshot { return isRecord(value) && Number.isSafeInteger(value.xp) && (value.xp as number) >= 0 && Number.isSafeInteger(value.level) && (value.level as number) >= 1; }

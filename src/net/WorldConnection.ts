@@ -1,4 +1,5 @@
 import {
+  createAttackTarget,
   createBankDeposit,
   createBankWithdraw,
   createCancelGathering,
@@ -13,6 +14,8 @@ import {
   createStartProcessing,
   parseServerMessage,
   type ActionRejectedMessage,
+  type CombatPlayerStateMessage,
+  type CombatWorldStateMessage,
   type GatheringMode,
   type PlayerStateMessage,
   type Position,
@@ -31,6 +34,8 @@ export class WorldConnection {
     private readonly onState: (state: ConnectionState, detail?: string) => void,
     private readonly onWorldState: (state: WorldStateMessage) => void,
     private readonly onPlayerState: (state: PlayerStateMessage) => void,
+    private readonly onCombatWorldState: (state: CombatWorldStateMessage) => void,
+    private readonly onCombatPlayerState: (state: CombatPlayerStateMessage) => void,
     private readonly onActionRejected: (message: ActionRejectedMessage) => void,
   ) {}
 
@@ -65,6 +70,8 @@ export class WorldConnection {
           if (!settled) return;
           if (message.type === 'WORLD_STATE') this.onWorldState(message);
           else if (message.type === 'PLAYER_STATE') this.onPlayerState(message);
+          else if (message.type === 'COMBAT_WORLD_STATE') this.onCombatWorldState(message);
+          else if (message.type === 'COMBAT_PLAYER_STATE') this.onCombatPlayerState(message);
           else this.onActionRejected(message);
         } catch (error) {
           socket.close(1002, 'invalid server message');
@@ -91,6 +98,7 @@ export class WorldConnection {
   bankWithdraw(serviceId: string, itemId: string, quantity = 1): boolean { return this.send(createBankWithdraw(this.sequence++, serviceId, itemId, quantity)); }
   merchantBuy(serviceId: string, itemId: string, quantity = 1): boolean { return this.send(createMerchantBuy(this.sequence++, serviceId, itemId, quantity)); }
   merchantSell(serviceId: string, itemId: string, quantity = 1): boolean { return this.send(createMerchantSell(this.sequence++, serviceId, itemId, quantity)); }
+  attackTarget(targetId: string): boolean { return this.send(createAttackTarget(this.sequence++, targetId)); }
   close(): void { this.socket?.close(1000, 'client shutdown'); this.socket = null; }
   private send(message: object): boolean { const socket = this.socket; if (!socket || socket.readyState !== WebSocket.OPEN) return false; socket.send(JSON.stringify(message)); return true; }
 }

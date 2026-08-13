@@ -1,5 +1,20 @@
 import { WorldConnection, type ConnectionState } from '../net/WorldConnection';
-import type { ActionRejectedMessage, GatheringMode, PlayerProgressSnapshot, PlayerSnapshot, PlayerStateMessage, ResourceNodeSnapshot, ServiceSnapshot, StationKind, StationSnapshot, WorldStateMessage } from '../protocol/v1';
+import type {
+  ActionRejectedMessage,
+  CombatPlayerStateMessage,
+  CombatProgressSnapshot,
+  CombatWorldStateMessage,
+  EnemySnapshot,
+  GatheringMode,
+  PlayerProgressSnapshot,
+  PlayerSnapshot,
+  PlayerStateMessage,
+  ResourceNodeSnapshot,
+  ServiceSnapshot,
+  StationKind,
+  StationSnapshot,
+  WorldStateMessage,
+} from '../protocol/v1';
 import { WorldView } from '../world/WorldView';
 
 const RESUME_TOKEN_KEY = 'glyphreach.devResumeToken.v1';
@@ -12,14 +27,16 @@ export class GlyphReachApp {
   private resources: ResourceNodeSnapshot[] = [];
   private stations: StationSnapshot[] = [];
   private services: ServiceSnapshot[] = [];
+  private enemies: EnemySnapshot[] = [];
   private progress: PlayerProgressSnapshot | null = null;
+  private combat: CombatProgressSnapshot | null = null;
   private readonly onKeyDown = (event: KeyboardEvent) => this.handleKeyDown(event);
 
   async mount(root: HTMLElement): Promise<void> {
     this.root = root;
     root.innerHTML = `
       <main class="shell">
-        <header class="topbar"><div><div class="eyebrow">FIRST ECONOMY LOOP</div><h1>GlyphReach</h1></div><div class="connection-pill" data-testid="connection-status">Connecting…</div></header>
+        <header class="topbar"><div><div class="eyebrow">FIRST COMBAT LOOP</div><h1>GlyphReach</h1></div><div class="connection-pill" data-testid="connection-status">Connecting…</div></header>
         <section class="world-shell" data-testid="world-shell">
           <div class="world-canvas" data-testid="world-canvas"></div>
           <aside class="connection-card">
@@ -29,13 +46,20 @@ export class GlyphReachApp {
             <div class="label">Position</div><div data-testid="local-position">—</div>
             <div class="label">Movement</div><div class="control-note">Click the world to move. WASD / arrows are alternate controls.</div>
 
+            <div class="label">Combat</div>
+            <div class="skill-line"><span>Health</span><strong data-testid="combat-health">— / —</strong></div>
+            <div class="skill-line"><span>Combat level / XP</span><strong><span data-testid="combat-level">1</span> · <span data-testid="combat-xp">0</span></strong></div>
+            <div class="skill-line"><span>Reach rat</span><strong data-testid="rat-health">—</strong></div>
+            <div class="skill-line"><span>Weapon</span><strong data-testid="equipped-weapon">None</strong></div>
+            <div class="button-stack"><button type="button" data-testid="attack-reach-rat">Attack Reach rat</button></div>
+
             <div class="label">Wallet</div><div class="skill-line"><span>Coins</span><strong data-testid="wallet-coins">0</strong></div>
 
             <div class="label">Mining</div><div class="skill-line"><span>Level / XP</span><strong><span data-testid="mining-level">1</span> · <span data-testid="mining-xp">0</span></strong></div>
             <div class="button-stack"><button type="button" data-testid="mine-focused">Focused mine</button><button type="button" data-testid="mine-steady">Steady mine · AFK</button><button type="button" class="button-muted" data-testid="mine-cancel">Cancel Mining</button></div>
 
             <div class="label">Smithing</div><div class="skill-line"><span>Level / XP</span><strong><span data-testid="smithing-level">1</span> · <span data-testid="smithing-xp">0</span></strong></div>
-            <div class="button-stack"><button type="button" data-testid="smelt-copper">Smelt copper ore</button><button type="button" data-testid="smith-pickaxe">Smith copper pickaxe</button><button type="button" class="button-muted" data-testid="processing-cancel">Cancel processing</button><button type="button" data-testid="equip-pickaxe">Equip copper pickaxe</button></div>
+            <div class="button-stack"><button type="button" data-testid="smelt-copper">Smelt copper ore</button><button type="button" data-testid="smith-pickaxe">Smith copper pickaxe</button><button type="button" data-testid="smith-sword">Smith copper sword</button><button type="button" class="button-muted" data-testid="processing-cancel">Cancel processing</button><button type="button" data-testid="equip-pickaxe">Equip copper pickaxe</button><button type="button" data-testid="equip-sword">Equip copper sword</button></div>
 
             <div class="label">Bank</div>
             <div class="skill-line"><span>Slots</span><strong data-testid="bank-slots">0 / —</strong></div>
@@ -47,8 +71,14 @@ export class GlyphReachApp {
             <div class="skill-line"><span>Copper ore sell</span><strong><span data-testid="ore-sell-price">—</span> coins</strong></div>
             <div class="button-stack"><button type="button" data-testid="merchant-buy-ore">Buy 1 copper ore</button><button type="button" data-testid="merchant-sell-ore">Sell 1 copper ore</button></div>
 
-            <div class="action-status" data-testid="action-status">Click near the vein, furnace, anvil, bank, or merchant before using its action.</div>
-            <div class="label">Inventory</div><div class="skill-line"><span>Slots</span><strong data-testid="inventory-slots">0 / —</strong></div><div class="skill-line"><span>Copper ore</span><strong data-testid="copper-ore-count">0</strong></div><div class="skill-line"><span>Copper bars</span><strong data-testid="copper-bar-count">0</strong></div><div class="skill-line"><span>Copper pickaxe</span><strong data-testid="copper-pickaxe-count">0</strong></div>
+            <div class="action-status" data-testid="action-status">Click near a world object before using its action.</div>
+            <div class="label">Inventory</div>
+            <div class="skill-line"><span>Slots</span><strong data-testid="inventory-slots">0 / —</strong></div>
+            <div class="skill-line"><span>Copper ore</span><strong data-testid="copper-ore-count">0</strong></div>
+            <div class="skill-line"><span>Copper bars</span><strong data-testid="copper-bar-count">0</strong></div>
+            <div class="skill-line"><span>Copper pickaxe</span><strong data-testid="copper-pickaxe-count">0</strong></div>
+            <div class="skill-line"><span>Copper sword</span><strong data-testid="copper-sword-count">0</strong></div>
+            <div class="skill-line"><span>Reach rat tail</span><strong data-testid="rat-tail-count">0</strong></div>
             <div class="label">Equipped tool</div><div data-testid="equipped-tool">None</div>
             <div class="label">World revision</div><div data-testid="world-revision">—</div>
             <div class="label">Build pair</div><div class="build-pair"><span>client <code data-testid="client-build"></code></span><span>server <code data-testid="server-build">—</code></span></div>
@@ -59,15 +89,27 @@ export class GlyphReachApp {
     const clientBuild = import.meta.env.VITE_GLYPHREACH_BUILD_SHA || 'dev';
     const wsUrl = import.meta.env.VITE_GLYPHREACH_WS_URL || 'ws://127.0.0.1:8787/world';
     this.requireElement(root, '[data-testid="client-build"]').textContent = clientBuild;
-    this.connection = new WorldConnection(wsUrl, clientBuild, (state, detail) => this.updateConnectionStatus(root, state, detail), (state) => this.applyWorldState(root, state), (state) => this.applyPlayerState(root, state), (message) => this.applyActionRejected(root, message));
+    this.connection = new WorldConnection(
+      wsUrl,
+      clientBuild,
+      (state, detail) => this.updateConnectionStatus(root, state, detail),
+      (state) => this.applyWorldState(root, state),
+      (state) => this.applyPlayerState(root, state),
+      (state) => this.applyCombatWorldState(root, state),
+      (state) => this.applyCombatPlayerState(root, state),
+      (message) => this.applyActionRejected(root, message),
+    );
 
+    this.button(root, 'attack-reach-rat', () => this.attackReachRat());
     this.button(root, 'mine-focused', () => this.startMining('focused'));
     this.button(root, 'mine-steady', () => this.startMining('steady'));
     this.button(root, 'mine-cancel', () => this.connection?.cancelGathering());
     this.button(root, 'smelt-copper', () => this.startProcessing('furnace', 'smelt_copper'));
     this.button(root, 'smith-pickaxe', () => this.startProcessing('anvil', 'smith_copper_pickaxe'));
+    this.button(root, 'smith-sword', () => this.startProcessing('anvil', 'smith_copper_sword'));
     this.button(root, 'processing-cancel', () => this.connection?.cancelProcessing());
     this.button(root, 'equip-pickaxe', () => this.connection?.equipItem('copper_pickaxe'));
+    this.button(root, 'equip-sword', () => this.connection?.equipItem('copper_sword'));
     this.button(root, 'bank-deposit-ore', () => this.bankTransfer('deposit', 'copper_ore'));
     this.button(root, 'bank-withdraw-ore', () => this.bankTransfer('withdraw', 'copper_ore'));
     this.button(root, 'merchant-buy-ore', () => this.merchantTrade('buy', 'copper_ore'));
@@ -80,13 +122,16 @@ export class GlyphReachApp {
       this.resources = welcome.resources;
       this.stations = welcome.stations;
       this.services = welcome.services;
+      this.enemies = welcome.enemies;
       this.progress = welcome.progress;
+      this.combat = welcome.combat;
       this.requireElement(root, '[data-testid="world-id"]').textContent = welcome.worldId;
       this.requireElement(root, '[data-testid="player-id"]').textContent = welcome.player.id;
       this.requireElement(root, '[data-testid="server-build"]').textContent = welcome.serverBuild;
       this.updatePlayerSummary(root, welcome.players);
       this.renderProgress(root);
       this.renderMerchantPrices(root);
+      this.renderCombat(root);
       await this.worldView.mount(this.requireElement(root, '[data-testid="world-canvas"]'), welcome, (target) => {
         if (this.connection?.moveTarget(target)) this.requireElement(root, '[data-testid="action-status"]').textContent = 'Moving to target…';
       });
@@ -109,11 +154,28 @@ export class GlyphReachApp {
     this.renderMerchantPrices(root);
   }
 
-  private applyPlayerState(root: HTMLElement, state: PlayerStateMessage): void { this.progress = state.progress; this.renderProgress(root); }
+  private applyPlayerState(root: HTMLElement, state: PlayerStateMessage): void {
+    this.progress = state.progress;
+    this.renderProgress(root);
+  }
+
+  private applyCombatWorldState(root: HTMLElement, state: CombatWorldStateMessage): void {
+    this.enemies = state.enemies;
+    this.worldView.updateEnemies(state.enemies);
+    this.renderCombat(root);
+    const rat = state.enemies.find((enemy) => enemy.kind === 'reach_rat');
+    if (rat && !rat.alive) this.requireElement(root, '[data-testid="action-status"]').textContent = 'Reach rat defeated · authoritative drop granted. It will respawn.';
+  }
+
+  private applyCombatPlayerState(root: HTMLElement, state: CombatPlayerStateMessage): void {
+    this.combat = state.combat;
+    this.renderCombat(root);
+    if (state.combat.health.dead) this.requireElement(root, '[data-testid="action-status"]').textContent = 'You were defeated. Respawning at the safe point…';
+  }
 
   private applyActionRejected(root: HTMLElement, message: ActionRejectedMessage): void {
     const labels: Record<ActionRejectedMessage['reason'], string> = {
-      invalid_target: 'That destination is outside the playable field.',
+      invalid_target: 'That target or destination is not valid.',
       too_far: 'Move closer to the required world object first.',
       node_unavailable: 'That vein is depleted. Give it a moment.',
       inventory_full: 'Your inventory is full.',
@@ -132,6 +194,9 @@ export class GlyphReachApp {
       insufficient_coins: 'You do not have enough coins.',
       item_not_traded: 'This merchant does not trade that item.',
       transaction_failed: 'The transaction could not be completed.',
+      target_dead: 'That enemy is already defeated.',
+      player_dead: 'You cannot act until you respawn.',
+      cooldown: 'Your next attack is not ready yet.',
     };
     this.requireElement(root, '[data-testid="action-status"]').textContent = labels[message.reason];
   }
@@ -154,12 +219,31 @@ export class GlyphReachApp {
     this.requireElement(root, '[data-testid="copper-ore-count"]').textContent = String(this.itemCount(progress.inventory.slots, 'copper_ore'));
     this.requireElement(root, '[data-testid="copper-bar-count"]').textContent = String(this.itemCount(progress.inventory.slots, 'copper_bar'));
     this.requireElement(root, '[data-testid="copper-pickaxe-count"]').textContent = String(this.itemCount(progress.inventory.slots, 'copper_pickaxe'));
+    this.requireElement(root, '[data-testid="copper-sword-count"]').textContent = String(this.itemCount(progress.inventory.slots, 'copper_sword'));
+    this.requireElement(root, '[data-testid="rat-tail-count"]').textContent = String(this.itemCount(progress.inventory.slots, 'reach_rat_tail'));
     this.requireElement(root, '[data-testid="bank-slots"]').textContent = `${progress.bank.slots.length} / ${progress.bank.capacity}`;
     this.requireElement(root, '[data-testid="bank-copper-ore-count"]').textContent = String(this.itemCount(progress.bank.slots, 'copper_ore'));
     this.requireElement(root, '[data-testid="equipped-tool"]').textContent = progress.equipment.toolItemId === 'copper_pickaxe' ? 'Copper pickaxe' : 'None';
-    if (progress.processing) this.requireElement(root, '[data-testid="action-status"]').textContent = progress.processing.recipeId === 'smelt_copper' ? 'Smelting copper…' : 'Smithing copper pickaxe…';
-    else if (progress.gathering) this.requireElement(root, '[data-testid="action-status"]').textContent = progress.gathering.mode === 'steady' ? 'Steady Mining active · continues automatically.' : 'Focused Mining…';
-    else if (progress.equipment.toolItemId === 'copper_pickaxe') this.requireElement(root, '[data-testid="action-status"]').textContent = 'Copper pickaxe equipped · Mining is faster.';
+    if (progress.processing) {
+      const label = progress.processing.recipeId === 'smelt_copper'
+        ? 'Smelting copper…'
+        : progress.processing.recipeId === 'smith_copper_sword' ? 'Smithing copper sword…' : 'Smithing copper pickaxe…';
+      this.requireElement(root, '[data-testid="action-status"]').textContent = label;
+    } else if (progress.gathering) {
+      this.requireElement(root, '[data-testid="action-status"]').textContent = progress.gathering.mode === 'steady' ? 'Steady Mining active · continues automatically.' : 'Focused Mining…';
+    }
+  }
+
+  private renderCombat(root: HTMLElement): void {
+    const combat = this.combat;
+    if (combat) {
+      this.requireElement(root, '[data-testid="combat-health"]').textContent = `${combat.health.current} / ${combat.health.max}`;
+      this.requireElement(root, '[data-testid="combat-level"]').textContent = String(combat.skill.level);
+      this.requireElement(root, '[data-testid="combat-xp"]').textContent = String(combat.skill.xp);
+      this.requireElement(root, '[data-testid="equipped-weapon"]').textContent = combat.equipment.weaponItemId === 'copper_sword' ? 'Copper sword' : 'None';
+    }
+    const rat = this.enemies.find((enemy) => enemy.kind === 'reach_rat');
+    this.requireElement(root, '[data-testid="rat-health"]').textContent = rat ? (rat.alive ? `${rat.health} / ${rat.maxHealth}` : 'Defeated') : '—';
   }
 
   private renderMerchantPrices(root: HTMLElement): void {
@@ -169,7 +253,15 @@ export class GlyphReachApp {
     this.requireElement(root, '[data-testid="ore-sell-price"]').textContent = ore ? String(ore.sellPrice) : '—';
   }
 
-  private itemCount(slots: Array<{ itemId: string; quantity: number }>, itemId: string): number { return slots.filter((slot) => slot.itemId === itemId).reduce((total, slot) => total + slot.quantity, 0); }
+  private itemCount(slots: Array<{ itemId: string; quantity: number }>, itemId: string): number {
+    return slots.filter((slot) => slot.itemId === itemId).reduce((total, slot) => total + slot.quantity, 0);
+  }
+
+  private attackReachRat(): void {
+    const rat = this.enemies.find((enemy) => enemy.kind === 'reach_rat');
+    if (!rat || !this.connection || !this.root) return;
+    if (this.connection.attackTarget(rat.id)) this.requireElement(this.root, '[data-testid="action-status"]').textContent = 'Attacking Reach rat…';
+  }
 
   private startMining(mode: GatheringMode): void {
     const node = this.resources.find((resource) => resource.kind === 'copper_vein');
@@ -180,32 +272,52 @@ export class GlyphReachApp {
   private startProcessing(kind: StationKind, recipeId: string): void {
     const station = this.stations.find((candidate) => candidate.kind === kind);
     if (!station || !this.connection || !this.root) return;
-    if (this.connection.startProcessing(station.id, recipeId)) this.requireElement(this.root, '[data-testid="action-status"]').textContent = kind === 'furnace' ? 'Starting smelt…' : 'Starting smithing…';
+    if (this.connection.startProcessing(station.id, recipeId)) {
+      const label = recipeId === 'smelt_copper' ? 'Starting smelt…' : recipeId === 'smith_copper_sword' ? 'Starting sword smithing…' : 'Starting pickaxe smithing…';
+      this.requireElement(this.root, '[data-testid="action-status"]').textContent = label;
+    }
   }
 
   private bankTransfer(direction: 'deposit' | 'withdraw', itemId: string): void {
     const bank = this.services.find((service) => service.kind === 'bank');
     if (!bank || !this.connection || !this.root) return;
-    const sent = direction === 'deposit'
-      ? this.connection.bankDeposit(bank.id, itemId, 1)
-      : this.connection.bankWithdraw(bank.id, itemId, 1);
+    const sent = direction === 'deposit' ? this.connection.bankDeposit(bank.id, itemId, 1) : this.connection.bankWithdraw(bank.id, itemId, 1);
     if (sent) this.requireElement(this.root, '[data-testid="action-status"]').textContent = direction === 'deposit' ? 'Depositing into bank…' : 'Withdrawing from bank…';
   }
 
   private merchantTrade(direction: 'buy' | 'sell', itemId: string): void {
     const merchant = this.services.find((service) => service.kind === 'merchant');
     if (!merchant || !this.connection || !this.root) return;
-    const sent = direction === 'buy'
-      ? this.connection.merchantBuy(merchant.id, itemId, 1)
-      : this.connection.merchantSell(merchant.id, itemId, 1);
+    const sent = direction === 'buy' ? this.connection.merchantBuy(merchant.id, itemId, 1) : this.connection.merchantSell(merchant.id, itemId, 1);
     if (sent) this.requireElement(this.root, '[data-testid="action-status"]').textContent = direction === 'buy' ? 'Buying from merchant…' : 'Selling to merchant…';
   }
 
-  private handleKeyDown(event: KeyboardEvent): void { if (event.ctrlKey || event.metaKey || event.altKey) return; const direction = directionForKey(event.key); if (!direction) return; event.preventDefault(); this.connection?.move(direction.dx, direction.dy); }
-  private updateConnectionStatus(root: HTMLElement, state: ConnectionState, detail?: string): void { const element = this.requireElement(root, '[data-testid="connection-status"]'); element.dataset.state = state; const labels: Record<ConnectionState, string> = { connecting: 'Connecting…', connected: 'Connected', rejected: 'Rejected', disconnected: 'Disconnected', error: 'Connection error' }; element.textContent = detail ? `${labels[state]} · ${detail}` : labels[state]; }
+  private handleKeyDown(event: KeyboardEvent): void {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    const direction = directionForKey(event.key);
+    if (!direction) return;
+    event.preventDefault();
+    this.connection?.move(direction.dx, direction.dy);
+  }
+
+  private updateConnectionStatus(root: HTMLElement, state: ConnectionState, detail?: string): void {
+    const element = this.requireElement(root, '[data-testid="connection-status"]');
+    element.dataset.state = state;
+    const labels: Record<ConnectionState, string> = { connecting: 'Connecting…', connected: 'Connected', rejected: 'Rejected', disconnected: 'Disconnected', error: 'Connection error' };
+    element.textContent = detail ? `${labels[state]} · ${detail}` : labels[state];
+  }
+
   private button(root: HTMLElement, testId: string, handler: () => void): void { this.requireElement(root, `[data-testid="${testId}"]`).addEventListener('click', handler); }
   private requireElement(root: HTMLElement, selector: string): HTMLElement { const element = root.querySelector<HTMLElement>(selector); if (!element) throw new Error(`Missing app element: ${selector}`); return element; }
 }
 
-function directionForKey(key: string): { dx: -1 | 0 | 1; dy: -1 | 0 | 1 } | null { switch (key.toLowerCase()) { case 'a': case 'arrowleft': return { dx: -1, dy: 0 }; case 'd': case 'arrowright': return { dx: 1, dy: 0 }; case 'w': case 'arrowup': return { dx: 0, dy: -1 }; case 's': case 'arrowdown': return { dx: 0, dy: 1 }; default: return null; } }
+function directionForKey(key: string): { dx: -1 | 0 | 1; dy: -1 | 0 | 1 } | null {
+  switch (key.toLowerCase()) {
+    case 'a': case 'arrowleft': return { dx: -1, dy: 0 };
+    case 'd': case 'arrowright': return { dx: 1, dy: 0 };
+    case 'w': case 'arrowup': return { dx: 0, dy: -1 };
+    case 's': case 'arrowdown': return { dx: 0, dy: 1 };
+    default: return null;
+  }
+}
 function escapeHtml(value: string): string { const div = document.createElement('div'); div.textContent = value; return div.innerHTML; }

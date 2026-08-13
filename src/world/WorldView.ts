@@ -1,5 +1,5 @@
 import { Application, Graphics } from 'pixi.js';
-import type { PlayerSnapshot, Position, ResourceNodeSnapshot, ServiceSnapshot, StationSnapshot, WelcomeMessage, WorldBounds } from '../protocol/v1';
+import type { EnemySnapshot, PlayerSnapshot, Position, ResourceNodeSnapshot, ServiceSnapshot, StationSnapshot, WelcomeMessage, WorldBounds } from '../protocol/v1';
 
 const FRAME_MARGIN = 36;
 
@@ -9,6 +9,7 @@ export class WorldView {
   private readonly resourceGraphics = new Map<string, Graphics>();
   private readonly stationGraphics = new Map<string, Graphics>();
   private readonly serviceGraphics = new Map<string, Graphics>();
+  private readonly enemyGraphics = new Map<string, Graphics>();
   private targetMarker: Graphics | null = null;
   private mounted = false;
   private bounds: WorldBounds | null = null;
@@ -17,6 +18,7 @@ export class WorldView {
   private latestResources: ResourceNodeSnapshot[] = [];
   private latestStations: StationSnapshot[] = [];
   private latestServices: ServiceSnapshot[] = [];
+  private latestEnemies: EnemySnapshot[] = [];
   private canvas: HTMLCanvasElement | null = null;
   private onMoveTarget: ((position: Position) => void) | null = null;
   private readonly onPointerDown = (event: PointerEvent) => this.handlePointerDown(event);
@@ -28,6 +30,7 @@ export class WorldView {
     this.latestResources = snapshot.resources;
     this.latestStations = snapshot.stations;
     this.latestServices = snapshot.services;
+    this.latestEnemies = snapshot.enemies;
     this.onMoveTarget = onMoveTarget;
     await this.app.init({ width: 960, height: 540, background: '#0b1017', antialias: true, resolution: Math.min(window.devicePixelRatio || 1, 2), autoDensity: true });
     this.app.canvas.setAttribute('aria-label', 'GlyphReach world');
@@ -45,6 +48,7 @@ export class WorldView {
     this.renderServices();
     this.renderStations();
     this.renderResources();
+    this.renderEnemies();
     this.renderPlayers();
   }
 
@@ -60,12 +64,18 @@ export class WorldView {
     this.renderPlayers();
   }
 
+  updateEnemies(enemies: EnemySnapshot[]): void {
+    this.latestEnemies = enemies;
+    if (this.mounted) this.renderEnemies();
+  }
+
   destroy(): void {
     this.canvas?.removeEventListener('pointerdown', this.onPointerDown);
     this.playerGraphics.clear();
     this.resourceGraphics.clear();
     this.stationGraphics.clear();
     this.serviceGraphics.clear();
+    this.enemyGraphics.clear();
     this.targetMarker = null;
     this.canvas = null;
     this.onMoveTarget = null;
@@ -156,6 +166,27 @@ export class WorldView {
         : new Graphics().circle(0, 0, 18).fill({ color: 0x5f4678 }).stroke({ color: 0xba91d8, width: 3 }).circle(0, -2, 7).fill({ color: 0xe4c56e });
       this.positionGraphic(graphic, service.position);
       this.serviceGraphics.set(service.id, graphic);
+      this.app.stage.addChild(graphic);
+    }
+  }
+
+  private renderEnemies(): void {
+    const ids = new Set(this.latestEnemies.map((enemy) => enemy.id));
+    for (const [id, graphic] of this.enemyGraphics) if (!ids.has(id)) { this.app.stage.removeChild(graphic); graphic.destroy(); this.enemyGraphics.delete(id); }
+    for (const enemy of this.latestEnemies) {
+      const existing = this.enemyGraphics.get(enemy.id);
+      if (existing) { this.app.stage.removeChild(existing); existing.destroy(); }
+      const ratio = enemy.maxHealth > 0 ? enemy.health / enemy.maxHealth : 0;
+      const graphic = enemy.alive
+        ? new Graphics()
+          .circle(0, 0, 17).fill({ color: 0x7e3f42 }).stroke({ color: 0xd57878, width: 3 })
+          .circle(-6, -10, 5).fill({ color: 0xa75a5c })
+          .circle(6, -10, 5).fill({ color: 0xa75a5c })
+          .rect(-17, 23, 34, 4).fill({ color: 0x3d2529 })
+          .rect(-17, 23, Math.max(0, 34 * ratio), 4).fill({ color: 0xb86a67 })
+        : new Graphics().circle(0, 0, 14).fill({ color: 0x332b2d }).stroke({ color: 0x665457, width: 2 });
+      this.positionGraphic(graphic, enemy.position);
+      this.enemyGraphics.set(enemy.id, graphic);
       this.app.stage.addChild(graphic);
     }
   }

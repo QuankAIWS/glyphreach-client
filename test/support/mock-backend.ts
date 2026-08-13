@@ -4,32 +4,65 @@ import { WebSocket, WebSocketServer } from 'ws';
 
 const port = Number(process.env.MOCK_BACKEND_PORT ?? 8787);
 const bounds = { minX: 0, minY: 0, maxX: 1000, maxY: 600 };
-const resource = { id: 'copper-vein-alpha-1', kind: 'copper_vein', position: { x: 760, y: 300 }, available: true, respawnAt: null as number | null };
+const resource = { id: 'copper-vein-alpha-1', kind: 'copper_vein' as const, position: { x: 760, y: 300 }, available: true, respawnAt: null as number | null };
 const stations = [
-  { id: 'furnace-alpha-1', kind: 'furnace', position: { x: 570, y: 155 } },
-  { id: 'anvil-alpha-1', kind: 'anvil', position: { x: 570, y: 445 } },
+  { id: 'furnace-alpha-1', kind: 'furnace' as const, position: { x: 570, y: 155 } },
+  { id: 'anvil-alpha-1', kind: 'anvil' as const, position: { x: 570, y: 445 } },
 ];
 const services = [
-  { id: 'bank-alpha-1', kind: 'bank', position: { x: 300, y: 180 } },
+  { id: 'bank-alpha-1', kind: 'bank' as const, position: { x: 300, y: 180 } },
   {
-    id: 'merchant-alpha-1', kind: 'merchant', position: { x: 300, y: 420 },
+    id: 'merchant-alpha-1',
+    kind: 'merchant' as const,
+    position: { x: 300, y: 420 },
     offers: [
       { itemId: 'copper_ore', buyPrice: 4, sellPrice: 2 },
       { itemId: 'copper_bar', buyPrice: 9, sellPrice: 3 },
       { itemId: 'copper_pickaxe', buyPrice: 22, sellPrice: 7 },
+      { itemId: 'copper_sword', buyPrice: 24, sellPrice: 8 },
     ],
   },
-] as const;
+];
+const enemy = {
+  id: 'reach-rat-alpha-1',
+  kind: 'reach_rat' as const,
+  position: { x: 820, y: 470 },
+  health: 14,
+  maxHealth: 14,
+  alive: true,
+  respawnAt: null as number | null,
+};
 
 let revision = 0;
+let combatRevision = 0;
 let playerNumber = 0;
-const players = new Map<WebSocket, {
+const players = new Map<WebSocket, Player>();
+
+interface Slot { slot: number; itemId: string; quantity: number; }
+interface Progress {
+  inventory: { capacity: number; slots: Slot[] };
+  bank: { capacity: number; slots: Slot[] };
+  wallet: { coins: number };
+  equipment: { toolItemId: string | null };
+  skills: { mining: { xp: number; level: number }; smithing: { xp: number; level: number } };
+  gathering: null | { nodeId: string; mode: 'focused' | 'steady'; startedAt: number; completesAt: number };
+  processing: null | { stationId: string; recipeId: string; startedAt: number; completesAt: number };
+}
+interface Combat {
+  health: { current: number; max: number; dead: boolean; respawnAt: number | null };
+  skill: { xp: number; level: number };
+  equipment: { weaponItemId: string | null };
+}
+interface Player {
   id: string;
   resumeToken: string;
   position: { x: number; y: number };
   progressRevision: number;
-  progress: ReturnType<typeof emptyProgress>;
-}>();
+  combatProgressRevision: number;
+  progress: Progress;
+  combat: Combat;
+  lastAttackAt: number;
+}
 
 const server = createServer((request, response) => {
   if (request.url === '/healthz') {
@@ -56,21 +89,37 @@ wss.on('connection', (socket) => {
       socket.close(1002, 'protocol mismatch');
       return;
     }
+
     playerNumber += 1;
-    const player = {
+    const player: Player = {
       id: `test-player-${playerNumber}`,
       resumeToken: randomUUID(),
       position: { x: 380 + playerNumber * 80, y: 300 },
       progressRevision: 0,
+      combatProgressRevision: 0,
       progress: emptyProgress(),
+      combat: emptyCombat(),
+      lastAttackAt: 0,
     };
     players.set(socket, player);
     revision += 1;
     socket.send(JSON.stringify({
-      type: 'WELCOME', protocolVersion: 1, serverBuild: 'mock-server', connectionId: randomUUID(),
-      resumeToken: player.resumeToken, worldId: 'alpha-1', player: snapshot(player), players: snapshots(),
-      resources: resources(), stations, services, progress: player.progress, world: { bounds },
-    }), () => broadcast());
+      type: 'WELCOME',
+      protocolVersion: 1,
+      serverBuild: 'mock-server',
+      connectionId: randomUUID(),
+      resumeToken: player.resumeToken,
+      worldId: 'alpha-1',
+      player: snapshot(player),
+      players: snapshots(),
+      resources: resources(),
+      stations,
+      services,
+      progress: player.progress,
+      enemies: enemies(),
+      combat: player.combat,
+      world: { bounds },
+    }), () => { broadcast(); broadcastCombat(); });
 
     socket.on('message', (nextData, nextIsBinary) => {
       if (nextIsBinary) return;
@@ -78,6 +127,12 @@ wss.on('connection', (socket) => {
       try { value = JSON.parse(nextData.toString()); } catch { return; }
       const message = value && typeof value === 'object' ? value as Record<string, unknown> : null;
       if (!message) return;
+
+      if (player.combat.health.dead) {
+        const action = actionCategory(String(message.type));
+        socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action, reason: 'player_dead' }));
+        return;
+      }
 
       if (message.type === 'MOVE_INTENT') {
         const dx = Number(message.dx);
@@ -95,7 +150,7 @@ wss.on('connection', (socket) => {
         const target = message.target as { x?: unknown; y?: unknown } | undefined;
         if (!target || typeof target.x !== 'number' || typeof target.y !== 'number') return;
         if (target.x < bounds.minX || target.x > bounds.maxX || target.y < bounds.minY || target.y > bounds.maxY) {
-          reject(socket, 'movement', 'invalid_target');
+          socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action: 'movement', reason: 'invalid_target' }));
           return;
         }
         player.position = { x: target.x, y: target.y };
@@ -105,17 +160,23 @@ wss.on('connection', (socket) => {
       }
 
       if (message.type === 'START_GATHERING') {
-        if (distance(player.position, resource.position) > 86) { reject(socket, 'gathering', 'too_far'); return; }
-        if (!resource.available) { reject(socket, 'gathering', 'node_unavailable'); return; }
+        if (Math.hypot(player.position.x - resource.position.x, player.position.y - resource.position.y) > 86) {
+          socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action: 'gathering', reason: 'too_far' }));
+          return;
+        }
+        if (!resource.available) {
+          socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action: 'gathering', reason: 'node_unavailable' }));
+          return;
+        }
         const mode = message.mode === 'steady' ? 'steady' : 'focused';
         const now = Date.now();
         player.progress.gathering = { nodeId: resource.id, mode, startedAt: now, completesAt: now + 100 };
         sendPlayerState(socket, player);
         setTimeout(() => {
-          if (!players.has(socket) || !resource.available) return;
+          if (!players.has(socket) || !resource.available || player.combat.health.dead) return;
           resource.available = false;
           resource.respawnAt = Date.now() + 120;
-          addItems(player.progress.inventory, 'copper_ore', 1);
+          addItem(player.progress.inventory.slots, 'copper_ore', 1, 1);
           player.progress.skills.mining.xp += mode === 'steady' ? 7 : 12;
           player.progress.gathering = null;
           sendPlayerState(socket, player);
@@ -140,26 +201,32 @@ wss.on('connection', (socket) => {
       if (message.type === 'START_PROCESSING') {
         const station = stations.find((candidate) => candidate.id === message.stationId);
         if (!station) return;
-        if (distance(player.position, station.position) > 86) { reject(socket, 'processing', 'too_far'); return; }
+        if (Math.hypot(player.position.x - station.position.x, player.position.y - station.position.y) > 86) {
+          socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action: 'processing', reason: 'too_far' }));
+          return;
+        }
         const recipeId = String(message.recipeId);
         const now = Date.now();
         player.progress.processing = { stationId: station.id, recipeId, startedAt: now, completesAt: now + 100 };
         sendPlayerState(socket, player);
         setTimeout(() => {
-          if (!players.has(socket)) return;
-          if (recipeId === 'smelt_copper' && consumeItems(player.progress.inventory, 'copper_ore', 1)) {
-            addItems(player.progress.inventory, 'copper_bar', 1);
+          if (!players.has(socket) || player.combat.health.dead) return;
+          let completed = false;
+          if (recipeId === 'smelt_copper' && consume(player.progress.inventory.slots, 'copper_ore', 1)) {
+            addItem(player.progress.inventory.slots, 'copper_bar', 1, 1);
             player.progress.skills.smithing.xp += 6;
-          } else if (recipeId === 'smith_copper_pickaxe' && consumeItems(player.progress.inventory, 'copper_bar', 2)) {
-            addItems(player.progress.inventory, 'copper_pickaxe', 1);
+            completed = true;
+          } else if (recipeId === 'smith_copper_pickaxe' && consume(player.progress.inventory.slots, 'copper_bar', 2)) {
+            addItem(player.progress.inventory.slots, 'copper_pickaxe', 1, 1);
             player.progress.skills.smithing.xp += 16;
-          } else {
-            player.progress.processing = null;
-            reject(socket, 'processing', 'missing_items');
-            sendPlayerState(socket, player);
-            return;
+            completed = true;
+          } else if (recipeId === 'smith_copper_sword' && consume(player.progress.inventory.slots, 'copper_bar', 2)) {
+            addItem(player.progress.inventory.slots, 'copper_sword', 1, 1);
+            player.progress.skills.smithing.xp += 16;
+            completed = true;
           }
           player.progress.processing = null;
+          if (!completed) socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action: 'processing', reason: 'missing_items' }));
           sendPlayerState(socket, player);
         }, 100);
         return;
@@ -173,7 +240,16 @@ wss.on('connection', (socket) => {
 
       if (message.type === 'EQUIP_ITEM') {
         const itemId = String(message.itemId);
-        if (!consumeItems(player.progress.inventory, itemId, 1)) { reject(socket, 'equipment', 'item_not_owned'); return; }
+        if (!consume(player.progress.inventory.slots, itemId, 1)) {
+          socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action: 'equipment', reason: 'item_not_owned' }));
+          return;
+        }
+        if (itemId === 'copper_sword') {
+          player.combat.equipment.weaponItemId = itemId;
+          sendPlayerState(socket, player);
+          sendCombatPlayerState(socket, player);
+          return;
+        }
         player.progress.equipment.toolItemId = itemId;
         sendPlayerState(socket, player);
         return;
@@ -181,90 +257,210 @@ wss.on('connection', (socket) => {
 
       if (message.type === 'BANK_DEPOSIT' || message.type === 'BANK_WITHDRAW') {
         const bank = services.find((service) => service.kind === 'bank' && service.id === message.serviceId);
-        const quantity = positiveQuantity(message.quantity);
-        const itemId = String(message.itemId ?? '');
-        if (!bank) { reject(socket, 'bank', 'invalid_service'); return; }
-        if (!quantity) { reject(socket, 'bank', 'invalid_quantity'); return; }
-        if (distance(player.position, bank.position) > 86) { reject(socket, 'bank', 'too_far'); return; }
-        if (message.type === 'BANK_DEPOSIT') {
-          if (!consumeItems(player.progress.inventory, itemId, quantity)) { reject(socket, 'bank', 'item_not_owned'); return; }
-          addItems(player.progress.bank, itemId, quantity);
-        } else {
-          if (!consumeItems(player.progress.bank, itemId, quantity)) { reject(socket, 'bank', 'bank_missing_item'); return; }
-          addItems(player.progress.inventory, itemId, quantity);
+        if (!bank || Math.hypot(player.position.x - bank.position.x, player.position.y - bank.position.y) > 86) {
+          socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action: 'bank', reason: bank ? 'too_far' : 'invalid_service' }));
+          return;
         }
+        const itemId = String(message.itemId);
+        const quantity = Number(message.quantity);
+        const source = message.type === 'BANK_DEPOSIT' ? player.progress.inventory.slots : player.progress.bank.slots;
+        const destination = message.type === 'BANK_DEPOSIT' ? player.progress.bank.slots : player.progress.inventory.slots;
+        if (!consume(source, itemId, quantity)) {
+          socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action: 'bank', reason: message.type === 'BANK_DEPOSIT' ? 'item_not_owned' : 'bank_missing_item' }));
+          return;
+        }
+        addItem(destination, itemId, quantity, stackLimitFor(itemId));
         sendPlayerState(socket, player);
         return;
       }
 
       if (message.type === 'MERCHANT_BUY' || message.type === 'MERCHANT_SELL') {
         const merchant = services.find((service) => service.kind === 'merchant' && service.id === message.serviceId);
-        const quantity = positiveQuantity(message.quantity);
-        const itemId = String(message.itemId ?? '');
-        if (!merchant || merchant.kind !== 'merchant') { reject(socket, 'merchant', 'invalid_service'); return; }
-        if (!quantity) { reject(socket, 'merchant', 'invalid_quantity'); return; }
-        if (distance(player.position, merchant.position) > 86) { reject(socket, 'merchant', 'too_far'); return; }
+        if (!merchant || merchant.kind !== 'merchant' || Math.hypot(player.position.x - merchant.position.x, player.position.y - merchant.position.y) > 86) {
+          socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action: 'merchant', reason: merchant ? 'too_far' : 'invalid_service' }));
+          return;
+        }
+        const itemId = String(message.itemId);
+        const quantity = Number(message.quantity);
         const offer = merchant.offers.find((candidate) => candidate.itemId === itemId);
-        if (!offer) { reject(socket, 'merchant', 'item_not_traded'); return; }
+        if (!offer) {
+          socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action: 'merchant', reason: 'item_not_traded' }));
+          return;
+        }
         if (message.type === 'MERCHANT_BUY') {
           const total = offer.buyPrice * quantity;
-          if (player.progress.wallet.coins < total) { reject(socket, 'merchant', 'insufficient_coins'); return; }
+          if (player.progress.wallet.coins < total) {
+            socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action: 'merchant', reason: 'insufficient_coins' }));
+            return;
+          }
           player.progress.wallet.coins -= total;
-          addItems(player.progress.inventory, itemId, quantity);
+          addItem(player.progress.inventory.slots, itemId, quantity, stackLimitFor(itemId));
         } else {
-          if (!consumeItems(player.progress.inventory, itemId, quantity)) { reject(socket, 'merchant', 'item_not_owned'); return; }
+          if (!consume(player.progress.inventory.slots, itemId, quantity)) {
+            socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action: 'merchant', reason: 'item_not_owned' }));
+            return;
+          }
           player.progress.wallet.coins += offer.sellPrice * quantity;
         }
         sendPlayerState(socket, player);
+        return;
+      }
+
+      if (message.type === 'ATTACK_TARGET') {
+        if (message.targetId !== enemy.id) {
+          socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action: 'combat', reason: 'invalid_target' }));
+          return;
+        }
+        if (!enemy.alive) {
+          socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action: 'combat', reason: 'target_dead' }));
+          return;
+        }
+        if (Math.hypot(player.position.x - enemy.position.x, player.position.y - enemy.position.y) > 82) {
+          socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action: 'combat', reason: 'too_far' }));
+          return;
+        }
+        const now = Date.now();
+        if (now - player.lastAttackAt < 80) {
+          socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action: 'combat', reason: 'cooldown' }));
+          return;
+        }
+        player.lastAttackAt = now;
+        const damage = player.combat.equipment.weaponItemId === 'copper_sword' ? 4 : 2;
+        enemy.health = Math.max(0, enemy.health - damage);
+        if (enemy.health === 0) {
+          enemy.alive = false;
+          enemy.respawnAt = now + 400;
+          player.progress.wallet.coins += 3;
+          addItem(player.progress.inventory.slots, 'reach_rat_tail', 1, 10);
+          player.combat.skill.xp += 12;
+          sendPlayerState(socket, player);
+          sendCombatPlayerState(socket, player);
+          combatRevision += 1;
+          broadcastCombat();
+          setTimeout(() => {
+            enemy.health = enemy.maxHealth;
+            enemy.alive = true;
+            enemy.respawnAt = null;
+            combatRevision += 1;
+            broadcastCombat();
+          }, 400);
+          return;
+        }
+
+        player.combat.health.current = Math.max(0, player.combat.health.current - 5);
+        if (player.combat.health.current === 0) {
+          player.combat.health.dead = true;
+          player.combat.health.respawnAt = now + 180;
+          sendCombatPlayerState(socket, player);
+          combatRevision += 1;
+          broadcastCombat();
+          setTimeout(() => {
+            if (!players.has(socket)) return;
+            player.position = { x: 440, y: 300 };
+            player.combat.health.current = player.combat.health.max;
+            player.combat.health.dead = false;
+            player.combat.health.respawnAt = null;
+            sendCombatPlayerState(socket, player);
+            revision += 1;
+            broadcast();
+          }, 180);
+          return;
+        }
+        sendCombatPlayerState(socket, player);
+        combatRevision += 1;
+        broadcastCombat();
       }
     });
   });
-  socket.on('close', () => { if (!players.delete(socket)) return; revision += 1; broadcast(); });
+
+  socket.on('close', () => {
+    if (!players.delete(socket)) return;
+    revision += 1;
+    broadcast();
+  });
 });
 
-function emptyProgress() {
+function emptyProgress(): Progress {
   return {
-    inventory: { capacity: 24, slots: [] as Array<{ slot: number; itemId: string; quantity: number }> },
-    bank: { capacity: 60, slots: [] as Array<{ slot: number; itemId: string; quantity: number }> },
+    inventory: { capacity: 24, slots: [] },
+    bank: { capacity: 60, slots: [] },
     wallet: { coins: 0 },
-    equipment: { toolItemId: null as string | null },
+    equipment: { toolItemId: null },
     skills: { mining: { xp: 0, level: 1 }, smithing: { xp: 0, level: 1 } },
-    gathering: null as null | { nodeId: string; mode: 'focused' | 'steady'; startedAt: number; completesAt: number },
-    processing: null as null | { stationId: string; recipeId: string; startedAt: number; completesAt: number },
+    gathering: null,
+    processing: null,
   };
 }
-
-function addItems(storage: { slots: Array<{ slot: number; itemId: string; quantity: number }> }, itemId: string, quantity: number): void {
-  const occupied = new Set(storage.slots.map((slot) => slot.slot));
-  for (let count = 0; count < quantity; count += 1) {
-    let slot = 0;
-    while (occupied.has(slot)) slot += 1;
-    storage.slots.push({ slot, itemId, quantity: 1 });
-    occupied.add(slot);
-  }
+function emptyCombat(): Combat {
+  return {
+    health: { current: 20, max: 20, dead: false, respawnAt: null },
+    skill: { xp: 0, level: 1 },
+    equipment: { weaponItemId: null },
+  };
 }
-
-function consumeItems(storage: { slots: Array<{ slot: number; itemId: string; quantity: number }> }, itemId: string, quantity: number): boolean {
-  const matches = storage.slots.filter((slot) => slot.itemId === itemId);
-  if (matches.length < quantity) return false;
-  for (let index = 0; index < quantity; index += 1) {
-    const target = matches[index]!;
-    const slotIndex = storage.slots.indexOf(target);
-    storage.slots.splice(slotIndex, 1);
+function addItem(slots: Slot[], itemId: string, quantity: number, stackLimit: number): void {
+  let remaining = quantity;
+  for (const slot of slots) {
+    if (remaining <= 0) break;
+    if (slot.itemId !== itemId || slot.quantity >= stackLimit) continue;
+    const added = Math.min(remaining, stackLimit - slot.quantity);
+    slot.quantity += added;
+    remaining -= added;
   }
+  const occupied = new Set(slots.map((slot) => slot.slot));
+  let slotNumber = 0;
+  while (remaining > 0) {
+    while (occupied.has(slotNumber)) slotNumber += 1;
+    const added = Math.min(remaining, stackLimit);
+    slots.push({ slot: slotNumber, itemId, quantity: added });
+    occupied.add(slotNumber);
+    remaining -= added;
+  }
+  slots.sort((a, b) => a.slot - b.slot);
+}
+function consume(slots: Slot[], itemId: string, quantity: number): boolean {
+  const total = slots.filter((slot) => slot.itemId === itemId).reduce((sum, slot) => sum + slot.quantity, 0);
+  if (total < quantity) return false;
+  let remaining = quantity;
+  for (const slot of slots) {
+    if (remaining <= 0 || slot.itemId !== itemId) continue;
+    const used = Math.min(remaining, slot.quantity);
+    slot.quantity -= used;
+    remaining -= used;
+  }
+  for (let index = slots.length - 1; index >= 0; index -= 1) if (slots[index]!.quantity <= 0) slots.splice(index, 1);
   return true;
 }
-
-function positiveQuantity(value: unknown): number | null {
-  return Number.isSafeInteger(value) && Number(value) >= 1 && Number(value) <= 99 ? Number(value) : null;
-}
-function snapshot(player: { id: string; position: { x: number; y: number } }) { return { id: player.id, position: { ...player.position } }; }
+function stackLimitFor(itemId: string): number { return itemId === 'reach_rat_tail' ? 10 : 1; }
+function snapshot(player: Player) { return { id: player.id, position: { ...player.position } }; }
 function snapshots() { return [...players.values()].map(snapshot).sort((a, b) => a.id.localeCompare(b.id)); }
 function resources() { return [{ ...resource, position: { ...resource.position } }]; }
-function sendPlayerState(socket: WebSocket, player: { progressRevision: number; progress: ReturnType<typeof emptyProgress> }) { player.progressRevision += 1; socket.send(JSON.stringify({ type: 'PLAYER_STATE', revision: player.progressRevision, progress: player.progress })); }
-function broadcast() { const payload = JSON.stringify({ type: 'WORLD_STATE', revision, players: snapshots(), resources: resources(), stations, services }); for (const socket of players.keys()) if (socket.readyState === WebSocket.OPEN) socket.send(payload); }
-function reject(socket: WebSocket, action: string, reason: string) { socket.send(JSON.stringify({ type: 'ACTION_REJECTED', action, reason })); }
-function distance(a: { x: number; y: number }, b: { x: number; y: number }): number { return Math.hypot(a.x - b.x, a.y - b.y); }
+function enemies() { return [{ ...enemy, position: { ...enemy.position } }]; }
+function sendPlayerState(socket: WebSocket, player: Player) {
+  player.progressRevision += 1;
+  socket.send(JSON.stringify({ type: 'PLAYER_STATE', revision: player.progressRevision, progress: player.progress }));
+}
+function sendCombatPlayerState(socket: WebSocket, player: Player) {
+  player.combatProgressRevision += 1;
+  socket.send(JSON.stringify({ type: 'COMBAT_PLAYER_STATE', revision: player.combatProgressRevision, combat: player.combat }));
+}
+function broadcast() {
+  const payload = JSON.stringify({ type: 'WORLD_STATE', revision, players: snapshots(), resources: resources(), stations, services });
+  for (const socket of players.keys()) if (socket.readyState === WebSocket.OPEN) socket.send(payload);
+}
+function broadcastCombat() {
+  const payload = JSON.stringify({ type: 'COMBAT_WORLD_STATE', revision: combatRevision, enemies: enemies() });
+  for (const socket of players.keys()) if (socket.readyState === WebSocket.OPEN) socket.send(payload);
+}
+function actionCategory(type: string): string {
+  if (type === 'MOVE_INTENT' || type === 'MOVE_TARGET') return 'movement';
+  if (type.includes('GATHERING')) return 'gathering';
+  if (type.includes('PROCESSING')) return 'processing';
+  if (type === 'EQUIP_ITEM') return 'equipment';
+  if (type.startsWith('BANK_')) return 'bank';
+  if (type.startsWith('MERCHANT_')) return 'merchant';
+  return 'combat';
+}
 function clamp(value: number, min: number, max: number): number { return Math.min(max, Math.max(min, value)); }
 server.listen(port, '127.0.0.1', () => console.log(`mock GlyphReach backend listening on ${port}`));
 const shutdown = () => { for (const client of wss.clients) client.terminate(); wss.close(() => server.close(() => process.exit(0))); };
