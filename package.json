@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test:unit": "node --import tsx --test test/protocol.test.ts",
     "test:e2e": "playwright test",
-    "test:mock-backend": "tsx test/support/mock-backend.ts",
+    "test:mock-backend": "tsx test/support/story-mock-backend.ts",
     "preview": "vite preview"
   },
   "dependencies": {
