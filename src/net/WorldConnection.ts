@@ -4,28 +4,30 @@ import {
   createBankWithdraw,
   createCancelGathering,
   createCancelProcessing,
-  createDialogueChoice,
   createEquipItem,
   createHello,
-  createInteractNpc,
   createMerchantBuy,
   createMerchantSell,
   createMoveIntent,
   createMoveTarget,
   createStartGathering,
   createStartProcessing,
-  parseServerMessage,
-  type ActionRejectedMessage,
   type CombatPlayerStateMessage,
   type CombatWorldStateMessage,
-  type DialogueStateMessage,
   type GatheringMode,
   type PlayerStateMessage,
   type Position,
-  type QuestStateMessage,
-  type WelcomeMessage,
   type WorldStateMessage,
 } from '../protocol/v1';
+import {
+  createDialogueChoice,
+  createInteractNpc,
+  parseGlyphReachServerMessage,
+  type ActionRejectedMessage,
+  type DialogueStateMessage,
+  type QuestStateMessage,
+  type WelcomeMessage,
+} from '../protocol/quest-v1';
 
 export type ConnectionState = 'connecting' | 'connected' | 'rejected' | 'disconnected' | 'error';
 
@@ -69,7 +71,7 @@ export class WorldConnection {
           return;
         }
         try {
-          const message = parseServerMessage(event.data);
+          const message = parseGlyphReachServerMessage(event.data);
           if (message.type === 'REJECT') {
             socket.close(1002, message.reason);
             finishReject(new Error(`World server rejected client: ${message.reason}`), 'rejected');
@@ -106,10 +108,7 @@ export class WorldConnection {
     });
   }
 
-  move(dx: -1 | 0 | 1, dy: -1 | 0 | 1): boolean {
-    if (dx === 0 && dy === 0) return false;
-    return this.send(createMoveIntent(this.sequence++, dx, dy));
-  }
+  move(dx: -1 | 0 | 1, dy: -1 | 0 | 1): boolean { if (dx === 0 && dy === 0) return false; return this.send(createMoveIntent(this.sequence++, dx, dy)); }
   moveTarget(target: Position): boolean { return this.send(createMoveTarget(this.sequence++, target)); }
   startGathering(nodeId: string, mode: GatheringMode): boolean { return this.send(createStartGathering(this.sequence++, nodeId, mode)); }
   cancelGathering(): boolean { return this.send(createCancelGathering(this.sequence++)); }
