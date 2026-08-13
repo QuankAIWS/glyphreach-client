@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Check out repository
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
 
@@ -61,10 +61,11 @@ jobs:
             exit 1
           fi
 
-      - name: Set up Node 24
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
-        with:
-          node-version: '24'
+      - name: Verify hosted Node runtime
+        shell: bash
+        run: |
+          node --version
+          npm --version
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
@@ -85,14 +86,3 @@ jobs:
 
       - name: Browser smoke and visual capture
         run: npm run test:e2e
-
-      - name: Upload browser review artifacts
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: glyphreach-connected-world-${{ github.run_number }}
-          path: |
-            test-results/
-            playwright-report/
-          retention-days: 10
-          if-no-files-found: warn
