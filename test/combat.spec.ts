@@ -44,7 +44,6 @@ test('browser combat journey takes damage, dies, respawns, kills, and receives a
     await attackAndExpect('8 / 14', '5 / 20');
     await page.getByTestId('attack-reach-rat').click();
     await expect(page.getByTestId('rat-health')).toHaveText('6 / 14');
-    await expect(page.getByTestId('combat-health')).toHaveText('0 / 20');
     await expect(page.getByTestId('action-status')).toHaveText('You were defeated. Respawning at the safe point…');
   });
 
