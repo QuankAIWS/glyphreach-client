@@ -1,16 +1,23 @@
 import { WorldConnection, type ConnectionState } from '../net/WorldConnection';
+import type { PlayerSnapshot, WorldStateMessage } from '../protocol/v1';
 import { WorldView } from '../world/WorldView';
+
+const RESUME_TOKEN_KEY = 'glyphreach.devResumeToken.v1';
 
 export class GlyphReachApp {
   private readonly worldView = new WorldView();
   private connection: WorldConnection | null = null;
+  private localPlayerId: string | null = null;
+  private root: HTMLElement | null = null;
+  private readonly onKeyDown = (event: KeyboardEvent) => this.handleKeyDown(event);
 
   async mount(root: HTMLElement): Promise<void> {
+    this.root = root;
     root.innerHTML = `
       <main class="shell">
         <header class="topbar">
           <div>
-            <div class="eyebrow">ALPHA FOUNDATION</div>
+            <div class="eyebrow">MULTIPLAYER FOUNDATION</div>
             <h1>GlyphReach</h1>
           </div>
           <div class="connection-pill" data-testid="connection-status">Connecting…</div>
@@ -22,11 +29,19 @@ export class GlyphReachApp {
             <div data-testid="world-id">Awaiting server…</div>
             <div class="label">Player</div>
             <div data-testid="player-id">Awaiting server…</div>
+            <div class="label">Players online</div>
+            <div data-testid="player-count">0</div>
+            <div class="label">Position</div>
+            <div data-testid="local-position">—</div>
+            <div class="label">World revision</div>
+            <div data-testid="world-revision">—</div>
             <div class="label">Build pair</div>
             <div class="build-pair">
               <span>client <code data-testid="client-build"></code></span>
               <span>server <code data-testid="server-build">—</code></span>
             </div>
+            <div class="label">Movement</div>
+            <div>WASD or arrow keys</div>
           </aside>
         </section>
       </main>
@@ -36,17 +51,25 @@ export class GlyphReachApp {
     const wsUrl = import.meta.env.VITE_GLYPHREACH_WS_URL || 'ws://127.0.0.1:8787/world';
     this.requireElement(root, '[data-testid="client-build"]').textContent = clientBuild;
 
-    this.connection = new WorldConnection(wsUrl, clientBuild, (state, detail) => {
-      this.updateConnectionStatus(root, state, detail);
-    });
+    this.connection = new WorldConnection(
+      wsUrl,
+      clientBuild,
+      (state, detail) => this.updateConnectionStatus(root, state, detail),
+      (state) => this.applyWorldState(root, state),
+    );
 
     try {
-      const welcome = await this.connection.connect();
+      const resumeToken = window.localStorage.getItem(RESUME_TOKEN_KEY) || undefined;
+      const welcome = await this.connection.connect(resumeToken);
+      window.localStorage.setItem(RESUME_TOKEN_KEY, welcome.resumeToken);
+      this.localPlayerId = welcome.player.id;
       this.requireElement(root, '[data-testid="world-id"]').textContent = welcome.worldId;
       this.requireElement(root, '[data-testid="player-id"]').textContent = welcome.player.id;
       this.requireElement(root, '[data-testid="server-build"]').textContent = welcome.serverBuild;
+      this.updatePlayerSummary(root, welcome.players);
       const canvasHost = this.requireElement(root, '[data-testid="world-canvas"]');
       await this.worldView.mount(canvasHost, welcome);
+      window.addEventListener('keydown', this.onKeyDown);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to enter GlyphReach';
       this.requireElement(root, '[data-testid="world-canvas"]').innerHTML = `
@@ -59,8 +82,33 @@ export class GlyphReachApp {
   }
 
   destroy(): void {
+    window.removeEventListener('keydown', this.onKeyDown);
     this.connection?.close();
     this.worldView.destroy();
+    this.root = null;
+  }
+
+  private applyWorldState(root: HTMLElement, state: WorldStateMessage): void {
+    this.worldView.updatePlayers(state.players);
+    this.requireElement(root, '[data-testid="world-revision"]').textContent = String(state.revision);
+    this.updatePlayerSummary(root, state.players);
+  }
+
+  private updatePlayerSummary(root: HTMLElement, players: PlayerSnapshot[]): void {
+    this.requireElement(root, '[data-testid="player-count"]').textContent = String(players.length);
+    const local = players.find((player) => player.id === this.localPlayerId);
+    if (local) {
+      this.requireElement(root, '[data-testid="local-position"]').textContent =
+        `${Math.round(local.position.x)}, ${Math.round(local.position.y)}`;
+    }
+  }
+
+  private handleKeyDown(event: KeyboardEvent): void {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    const direction = directionForKey(event.key);
+    if (!direction) return;
+    event.preventDefault();
+    this.connection?.move(direction.dx, direction.dy);
   }
 
   private updateConnectionStatus(root: HTMLElement, state: ConnectionState, detail?: string): void {
@@ -80,6 +128,25 @@ export class GlyphReachApp {
     const element = root.querySelector<HTMLElement>(selector);
     if (!element) throw new Error(`Missing app element: ${selector}`);
     return element;
+  }
+}
+
+function directionForKey(key: string): { dx: -1 | 0 | 1; dy: -1 | 0 | 1 } | null {
+  switch (key.toLowerCase()) {
+    case 'a':
+    case 'arrowleft':
+      return { dx: -1, dy: 0 };
+    case 'd':
+    case 'arrowright':
+      return { dx: 1, dy: 0 };
+    case 'w':
+    case 'arrowup':
+      return { dx: 0, dy: -1 };
+    case 's':
+    case 'arrowdown':
+      return { dx: 0, dy: 1 };
+    default:
+      return null;
   }
 }
 
