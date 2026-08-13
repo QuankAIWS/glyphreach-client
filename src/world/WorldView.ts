@@ -88,8 +88,12 @@ export class WorldView {
   }
 
   private handlePointerDown(event: PointerEvent): void {
-    if (event.button !== 0 || !this.canvas || !this.bounds || !this.onMoveTarget) return;
-    const rect = this.canvas.getBoundingClientRect();
+    const canvas = this.canvas;
+    const bounds = this.bounds;
+    const marker = this.targetMarker;
+    const moveTarget = this.onMoveTarget;
+    if (event.button !== 0 || !canvas || !bounds || !marker || !moveTarget) return;
+    const rect = canvas.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
     const stageX = ((event.clientX - rect.left) / rect.width) * this.app.screen.width;
     const stageY = ((event.clientY - rect.top) / rect.height) * this.app.screen.height;
@@ -103,12 +107,12 @@ export class WorldView {
     const normalizedX = (stageX - FRAME_MARGIN) / innerWidth;
     const normalizedY = (stageY - FRAME_MARGIN) / innerHeight;
     const target = {
-      x: this.bounds.minX + normalizedX * (this.bounds.maxX - this.bounds.minX),
-      y: this.bounds.minY + normalizedY * (this.bounds.maxY - this.bounds.minY),
+      x: bounds.minX + normalizedX * (bounds.maxX - bounds.minX),
+      y: bounds.minY + normalizedY * (bounds.maxY - bounds.minY),
     };
-    this.positionGraphic(this.targetMarker, target);
-    this.targetMarker.visible = true;
-    this.onMoveTarget(target);
+    this.positionGraphic(marker, target);
+    marker.visible = true;
+    moveTarget(target);
   }
 
   private renderPlayers(): void {
