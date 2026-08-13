@@ -17,7 +17,7 @@ export interface DialogueStateMessage { type: 'DIALOGUE_STATE'; revision: number
 export interface QuestActionRejectedMessage {
   type: 'ACTION_REJECTED';
   action: 'quest';
-  reason: 'invalid_npc' | 'conversation_not_open' | 'invalid_choice' | 'quest_not_ready' | 'quest_already_completed' | 'too_far' | 'already_busy' | 'player_dead' | 'missing_items' | 'transaction_failed';
+  reason: 'invalid_npc' | 'conversation_not_open' | 'invalid_choice' | 'quest_not_ready' | 'quest_already_completed' | 'too_far' | 'already_busy' | 'player_dead' | 'missing_items' | 'transaction_failed' | 'route_locked';
 }
 export type ActionRejectedMessage = BaseActionRejectedMessage | QuestActionRejectedMessage;
 export interface WelcomeMessage extends BaseWelcomeMessage { npcs: NpcSnapshot[]; quests: QuestJournalSnapshot[]; }
@@ -30,21 +30,13 @@ export function parseGlyphReachServerMessage(raw: string): ServerMessage {
   let value: unknown;
   try { value = JSON.parse(raw); } catch { throw new Error('Server sent invalid JSON'); }
   if (!isRecord(value) || typeof value.type !== 'string') throw new Error('Server message is missing a type');
-
-  if (value.type === 'QUEST_STATE') {
-    if (!Number.isSafeInteger(value.revision) || !isQuests(value.quests)) throw new Error('Malformed QUEST_STATE message');
-    return value as unknown as QuestStateMessage;
-  }
-  if (value.type === 'DIALOGUE_STATE') {
-    if (!Number.isSafeInteger(value.revision) || !(value.dialogue === null || isDialogue(value.dialogue))) throw new Error('Malformed DIALOGUE_STATE message');
-    return value as unknown as DialogueStateMessage;
-  }
+  if (value.type === 'QUEST_STATE') { if (!Number.isSafeInteger(value.revision) || !isQuests(value.quests)) throw new Error('Malformed QUEST_STATE message'); return value as unknown as QuestStateMessage; }
+  if (value.type === 'DIALOGUE_STATE') { if (!Number.isSafeInteger(value.revision) || !(value.dialogue === null || isDialogue(value.dialogue))) throw new Error('Malformed DIALOGUE_STATE message'); return value as unknown as DialogueStateMessage; }
   if (value.type === 'ACTION_REJECTED' && value.action === 'quest') {
-    const reasons = ['invalid_npc', 'conversation_not_open', 'invalid_choice', 'quest_not_ready', 'quest_already_completed', 'too_far', 'already_busy', 'player_dead', 'missing_items', 'transaction_failed'];
+    const reasons = ['invalid_npc', 'conversation_not_open', 'invalid_choice', 'quest_not_ready', 'quest_already_completed', 'too_far', 'already_busy', 'player_dead', 'missing_items', 'transaction_failed', 'route_locked'];
     if (!reasons.includes(String(value.reason))) throw new Error('Malformed ACTION_REJECTED message');
     return value as unknown as QuestActionRejectedMessage;
   }
-
   const base = parseServerMessage(raw);
   if (base.type !== 'WELCOME') return base as ServerMessage;
   if (!isNpcs(value.npcs) || !isQuests(value.quests)) throw new Error('Malformed WELCOME quest projection');
@@ -56,12 +48,7 @@ function isPosition(value: unknown): boolean { return isRecord(value) && typeof 
 function isNpc(value: unknown): value is NpcSnapshot { return isRecord(value) && typeof value.id === 'string' && typeof value.displayName === 'string' && isPosition(value.position); }
 function isNpcs(value: unknown): value is NpcSnapshot[] { return Array.isArray(value) && value.every(isNpc); }
 function isObjective(value: unknown): value is QuestObjectiveSnapshot { return isRecord(value) && typeof value.id === 'string' && typeof value.label === 'string' && typeof value.complete === 'boolean'; }
-function isQuest(value: unknown): value is QuestJournalSnapshot {
-  return isRecord(value) && typeof value.questId === 'string' && typeof value.title === 'string' &&
-    (value.status === 'not_started' || value.status === 'active' || value.status === 'completed') &&
-    (value.stage === 'available' || value.stage === 'fieldwork' || value.stage === 'return' || value.stage === 'completed') &&
-    Array.isArray(value.objectives) && value.objectives.every(isObjective);
-}
+function isQuest(value: unknown): value is QuestJournalSnapshot { return isRecord(value) && typeof value.questId === 'string' && typeof value.title === 'string' && (value.status === 'not_started' || value.status === 'active' || value.status === 'completed') && (value.stage === 'available' || value.stage === 'fieldwork' || value.stage === 'return' || value.stage === 'completed') && Array.isArray(value.objectives) && value.objectives.every(isObjective); }
 function isQuests(value: unknown): value is QuestJournalSnapshot[] { return Array.isArray(value) && value.every(isQuest); }
 function isChoice(value: unknown): value is DialogueChoiceSnapshot { return isRecord(value) && typeof value.id === 'string' && typeof value.label === 'string'; }
 function isDialogue(value: unknown): value is DialogueSnapshot { return isRecord(value) && typeof value.npcId === 'string' && typeof value.speaker === 'string' && typeof value.text === 'string' && Array.isArray(value.choices) && value.choices.every(isChoice); }
