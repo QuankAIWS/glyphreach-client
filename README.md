@@ -4,6 +4,57 @@ GlyphReach Client is the public browser client for **GlyphReach**, a persistent 
 
 This repository is intentionally limited to player-facing presentation and browser-safe code. The authoritative game runtime is maintained separately in the private `QuankAIWS/glyphreach-backend` repository.
 
+## Current executable foundation
+
+**Milestone 0: Connected World is implemented.**
+
+The client currently provides:
+
+- TypeScript + Vite browser application;
+- PixiJS world renderer;
+- browser-safe protocol v1 definitions/parsing;
+- native browser WebSocket connection;
+- `HELLO` handshake carrying protocol version and client build identifier;
+- handling of authoritative `WELCOME` snapshots and explicit server rejection;
+- rendering of server-provided world bounds and temporary player position;
+- connection/world/player/client-build/server-build status UI;
+- protocol unit tests;
+- Playwright browser smoke coverage and screenshot generation;
+- GitHub-hosted `ubuntu-latest` CI.
+
+The browser does not decide authoritative player position or other persistent/economic outcomes. The backend sends the snapshot; Pixi renders it.
+
+The next milestone is shared server-authoritative presence and movement for three concurrent clients.
+
+## Local development
+
+Install dependencies and run the client:
+
+```bash
+npm install
+npm run typecheck
+npm run test:unit
+npm run build
+npm run dev
+```
+
+By default the browser expects the development backend at:
+
+```text
+ws://127.0.0.1:8787/world
+```
+
+Override it with `VITE_GLYPHREACH_WS_URL` when needed. `VITE_GLYPHREACH_BUILD_SHA` may be supplied during builds so the client advertises an exact revision in the handshake.
+
+For browser verification:
+
+```bash
+npm run build
+npm run test:e2e
+```
+
+Playwright starts a **test-only protocol stub** and the built client, verifies the connected Pixi surface, and writes a screenshot under `test-results/`. The stub exists only for public-client testing; it is not game authority or production backend code.
+
 ## Repository boundary
 
 This repository may contain:
@@ -32,11 +83,9 @@ The browser may request an action. The backend decides whether the action is leg
 
 ## CI policy
 
-Public client CI uses **GitHub-hosted runners**. Long-running browser and visual-review jobs belong here so screenshot and test artifacts can use the public-repository Actions lane without consuming the private self-hosted runner.
+Public client CI uses **GitHub-hosted runners**. Do not add this repository to the private self-hosted runner group.
 
-## Development status
-
-Early foundation work. The first product target is a tiny but complete persistent multiplayer RPG loop: authenticate, enter a shared world, move, gather, craft, fight, quest, persist, disconnect, and recover.
+The current restricted Actions allowlist permits the green build/test path but still blocks the additional pinned Actions desired for explicit Node setup and artifact upload. Therefore the browser screenshot is currently generated during CI but not retained as an uploaded Actions artifact. The private backend `docs/STATUS.md` records the exact manual allowlist change required before those actions are reintroduced.
 
 ## License and ownership
 
