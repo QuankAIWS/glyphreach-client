@@ -43,6 +43,23 @@ async function clickWorld(page: Page, canvas: Locator, positionLabel: Locator, w
   const x = box.x + cameraX + world.x * 2;
   const y = box.y + cameraY + world.y * 2;
   if (x < box.x || x > box.x + box.width || y < box.y || y > box.y + box.height) throw new Error('Combat target is outside the visible camera');
+
+  // This must remain a real browser hit-test. If HUD chrome covers a world
+  // target, report the blocker instead of dispatching directly to the canvas
+  // and accidentally proving an interaction a player could not perform.
+  const hit = await page.evaluate(({ x, y }) => {
+    const element = document.elementFromPoint(x, y) as HTMLElement | null;
+    return {
+      tag: element?.tagName ?? 'NONE',
+      className: typeof element?.className === 'string' ? element.className : '',
+      testId: element?.dataset.testid ?? '',
+      ariaLabel: element?.getAttribute('aria-label') ?? '',
+    };
+  }, { x, y });
+  if (hit.tag !== 'CANVAS') {
+    throw new Error(`Combat target is obscured by ${hit.tag}${hit.testId ? `[data-testid=${hit.testId}]` : ''}${hit.className ? `.${hit.className}` : ''}${hit.ariaLabel ? ` (${hit.ariaLabel})` : ''}`);
+  }
+
   await page.mouse.click(x, y);
 }
 
