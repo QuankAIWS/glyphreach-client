@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   visual:
-    name: Fast player-facing visual capture
+    name: Fast player-facing interaction and visual gate
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -36,8 +36,8 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Capture world-first shell
-        run: npx playwright test test/world-first-visual.spec.ts
+      - name: Exercise player-facing world controls and capture shell
+        run: npx playwright test test/player-interface.spec.ts test/world-first-visual.spec.ts
 
       - name: Emit screenshot for visual review
         if: always()
