@@ -75,7 +75,7 @@ test('left clicking copper walks into range and completes the default mining act
   await expect(page.getByTestId('mining-xp')).not.toHaveText('0');
 });
 
-test('banking and trading exist only at their physical world services', async ({ page }) => {
+test('banking exists only at the physical bank and transfers authoritative inventory', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/?prototype=0');
   await expect(page.getByTestId('connection-status')).toHaveText('Connected');
@@ -93,14 +93,23 @@ test('banking and trading exist only at their physical world services', async ({
   await oreRow.getByRole('button', { name: 'All' }).click();
   await expect(page.getByTestId('bank-copper-ore-count')).toHaveText('1');
   await expect(page.getByTestId('copper-ore-count')).toHaveText('0');
+  await expect(bank).toContainText('Stored');
+  await expect(bank).not.toContainText('Buy 1');
+});
 
-  // Merchant is a different world object and opens a different focused interface.
-  await clickWorld(page, canvas, position, { x: 300, y: 420 });
+test('trading exists only at the physical merchant and does not expose bank storage', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/?prototype=0');
+  await expect(page.getByTestId('connection-status')).toHaveText('Connected');
+  const canvas = page.locator('canvas[aria-label="GlyphReach world"]');
+
+  await clickWorld(page, canvas, page.getByTestId('local-position'), { x: 300, y: 420 });
   const merchant = page.getByTestId('player-context-panel');
   await expect(merchant).toContainText('Merchant', { timeout: 6_000 });
   await expect(merchant).toContainText('Copper ore');
   await expect(merchant.getByRole('button', { name: 'Buy 1' }).first()).toBeVisible();
   await expect(merchant).not.toContainText('Stored');
+  await expect(merchant).not.toContainText('Deposit');
 });
 
 test('workstations expose only recipes for the world station being used', async ({ page }) => {
