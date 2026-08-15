@@ -13,21 +13,18 @@ if (!root) throw new Error('GlyphReach root element not found');
 
 const app = new GlyphReachApp();
 
-// App.mount builds the base DOM synchronously before it waits for the server and
-// Pixi. Keep the presentation pass on that original boundary so Pixi measures
-// the final world-shell layout, then wait for mount completion before attaching
-// player-facing world interaction listeners. This preserves camera geometry
-// while ensuring the first click cannot race the asynchronously-created canvas.
-const mountPromise = app.mount(root);
+// App.mount builds the base DOM synchronously before its first network/Pixi
+// await. Finalize the player-facing shell on that boundary so Pixi measures the
+// correct layout. Then install interaction controllers against the stable shell
+// immediately: they can observe/bind the canvas as it appears, so there is no
+// gap where the canvas is visible but the first player click has no controller.
+void app.mount(root);
 applyStoryPolish(root);
 applyM9Chapter(root, app);
 applyWorldFirstPresentation(root);
-
-void mountPromise.then(() => {
-  installPlayerInterface(root, app);
-  installGroundContextMenu(root);
-  installCombatIntent(root, app);
-  installChapterLandmarks(root, app);
-});
+installGroundContextMenu(root);
+installPlayerInterface(root, app);
+installCombatIntent(root, app);
+installChapterLandmarks(root, app);
 
 window.addEventListener('beforeunload', () => app.destroy(), { once: true });
