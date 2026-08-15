@@ -7,6 +7,7 @@ import { applyM9Chapter } from './app/m9-chapter';
 import { installPlayerInterface } from './app/world-interaction-interface';
 import { applyStoryPolish } from './app/story-polish';
 import { applyWorldFirstPresentation } from './app/world-first-presentation';
+import './app/player-interface-layout.css';
 
 const root = document.querySelector<HTMLElement>('#app');
 if (!root) throw new Error('GlyphReach root element not found');
