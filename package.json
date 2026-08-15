@@ -8,7 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test:unit": "node --import tsx --test test/protocol.test.ts",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --grep-invert @persistent-combat && playwright test test/combat-intent.spec.ts",
     "test:mock-backend": "tsx test/support/story-mock-backend.ts",
     "preview": "vite preview"
   },
