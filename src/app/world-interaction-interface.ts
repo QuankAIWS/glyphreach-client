@@ -354,8 +354,9 @@ class PlayerInterface {
     const progress = this.state.progress;
     this.setupPanel('Inventory', 'Field pack', progress ? `${progress.inventory.slots.length} / ${progress.inventory.capacity} slots used` : 'Loading…');
     const list = el('div', 'item-list');
-    if (!progress?.inventory.slots.length) list.append(empty('Your pack is empty.'));
-    for (const slot of progress?.inventory.slots ?? []) {
+    if (!progress) { list.append(empty('Loading your pack…')); this.panel.append(list); this.panel.hidden = false; return; }
+    if (!progress.inventory.slots.length) list.append(empty('Your pack is empty.'));
+    for (const slot of progress.inventory.slots) {
       const row = itemRow(slot.itemId, slot.quantity); const actions = row.querySelector<HTMLElement>('.item-actions')!;
       const equippedTool = progress.equipment.toolItemId === slot.itemId; const equippedWeapon = this.state.combat?.equipment.weaponItemId === slot.itemId;
       if (slot.itemId === 'copper_pickaxe' || slot.itemId === 'copper_sword') actions.append(actionButton(equippedTool || equippedWeapon ? 'Equipped' : 'Equip', () => this.state.connection?.equipItem(slot.itemId), equippedTool || equippedWeapon));
@@ -473,14 +474,14 @@ class PlayerInterface {
   private screenToWorld(clientX: number, clientY: number): Position | null {
     const canvas = this.canvas, local = this.localPosition(); if (!canvas || !local) return null;
     const r = canvas.getBoundingClientRect(); if (!r.width || !r.height) return null;
-    const camera = camera(r.width, r.height, local);
-    return { x: clamp((clientX - r.left - camera.x) / CAMERA_SCALE, WORLD.minX, WORLD.maxX), y: clamp((clientY - r.top - camera.y) / CAMERA_SCALE, WORLD.minY, WORLD.maxY) };
+    const view = camera(r.width, r.height, local);
+    return { x: clamp((clientX - r.left - view.x) / CAMERA_SCALE, WORLD.minX, WORLD.maxX), y: clamp((clientY - r.top - view.y) / CAMERA_SCALE, WORLD.minY, WORLD.maxY) };
   }
 
   private worldToShell(position: Position): Position | null {
     const canvas = this.canvas, local = this.localPosition(); if (!canvas || !local) return null;
-    const r = canvas.getBoundingClientRect(), shell = this.worldShell.getBoundingClientRect(), c = camera(r.width, r.height, local);
-    return { x: r.left - shell.left + c.x + position.x * CAMERA_SCALE, y: r.top - shell.top + c.y + position.y * CAMERA_SCALE };
+    const r = canvas.getBoundingClientRect(), shell = this.worldShell.getBoundingClientRect(), view = camera(r.width, r.height, local);
+    return { x: r.left - shell.left + view.x + position.x * CAMERA_SCALE, y: r.top - shell.top + view.y + position.y * CAMERA_SCALE };
   }
 
   private localPosition(): Position | null {
