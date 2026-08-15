@@ -86,3 +86,19 @@ jobs:
 
       - name: Browser smoke and visual capture
         run: npm run test:e2e
+
+      - name: Emit world-first screenshot for visual review
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          image=test-results/world-first-home.png
+          if [[ ! -f "$image" ]]; then
+            echo "visual capture not produced: $image"
+            exit 0
+          fi
+          echo "GLYPHREACH_SCREENSHOT_BYTES=$(wc -c < "$image")"
+          echo 'GLYPHREACH_SCREENSHOT_BASE64_BEGIN'
+          base64 -w 0 "$image"
+          echo
+          echo 'GLYPHREACH_SCREENSHOT_BASE64_END'
