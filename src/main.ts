@@ -1,5 +1,6 @@
 import './style.css';
 import { GlyphReachApp } from './app/App';
+import { installChapterLandmarks } from './app/chapter-landmarks';
 import { installCombatIntent } from './app/combat-intent';
 import { installGroundContextMenu } from './app/ground-context';
 import { applyM9Chapter } from './app/m9-chapter';
@@ -16,4 +17,5 @@ applyWorldFirstPresentation(root);
 installPlayerInterface(root, app);
 installGroundContextMenu(root);
 installCombatIntent(root, app);
+installChapterLandmarks(root, app);
 window.addEventListener('beforeunload', () => app.destroy(), { once: true });
