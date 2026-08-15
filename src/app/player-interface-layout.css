@@ -8,10 +8,12 @@
   bottom: auto;
   flex-direction: column;
   transform: translateY(-50%);
+  pointer-events: none;
 }
 
 .player-quickbar button {
   min-width: 58px;
+  pointer-events: auto;
 }
 
 .player-context-panel.utility-panel {
