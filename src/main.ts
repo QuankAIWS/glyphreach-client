@@ -1,5 +1,6 @@
 import './style.css';
 import { GlyphReachApp } from './app/App';
+import { installGroundContextMenu } from './app/ground-context';
 import { applyM9Chapter } from './app/m9-chapter';
 import { installPlayerInterface } from './app/world-interaction-interface';
 import { applyStoryPolish } from './app/story-polish';
@@ -12,4 +13,5 @@ applyStoryPolish(root);
 applyM9Chapter(root, app);
 applyWorldFirstPresentation(root);
 installPlayerInterface(root, app);
+installGroundContextMenu(root);
 window.addEventListener('beforeunload', () => app.destroy(), { once: true });
