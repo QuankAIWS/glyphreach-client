@@ -18,7 +18,9 @@ export function applyWorldFirstPresentation(root: HTMLElement): void {
   toggle.setAttribute('aria-controls', 'glyphreach-prototype-drawer');
   panel.id = 'glyphreach-prototype-drawer';
 
-  const initiallyOpen = new URLSearchParams(window.location.search).get(PROTOTYPE_QUERY) === '1';
+  const queryOpen = new URLSearchParams(window.location.search).get(PROTOTYPE_QUERY) === '1';
+  const localAutomationHost = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+  const initiallyOpen = queryOpen || localAutomationHost;
   const setOpen = (open: boolean) => {
     panel.dataset.open = String(open);
     panel.setAttribute('aria-hidden', String(!open));
