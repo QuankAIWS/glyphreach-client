@@ -1,0 +1,40 @@
+.world-first-stage.legacy-test-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  width: min(1240px, calc(100% - 32px));
+  height: auto;
+  min-height: 540px;
+  margin: 18px auto 48px;
+  overflow: hidden;
+}
+
+.legacy-test-layout .world-canvas {
+  min-height: 540px;
+}
+
+.legacy-test-layout .world-canvas canvas {
+  width: 100%;
+  height: auto;
+  max-width: 960px;
+  object-fit: contain;
+}
+
+.legacy-test-layout .prototype-drawer {
+  position: static;
+  width: auto;
+  max-height: none;
+  border: 0;
+  border-left: 1px solid #334036;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  transform: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+.legacy-test-layout .prototype-drawer-toggle,
+.legacy-test-layout .world-hud {
+  display: none;
+}
