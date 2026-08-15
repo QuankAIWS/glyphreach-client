@@ -1,7 +1,7 @@
 import './style.css';
 import { GlyphReachApp } from './app/App';
 import { applyM9Chapter } from './app/m9-chapter';
-import { installPlayerInterface } from './app/player-interface';
+import { installPlayerInterface } from './app/world-interaction-interface';
 import { applyStoryPolish } from './app/story-polish';
 import { applyWorldFirstPresentation } from './app/world-first-presentation';
 const root = document.querySelector<HTMLElement>('#app');
