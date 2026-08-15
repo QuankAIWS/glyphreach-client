@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 test('one hostile click acquires a target and produces repeated authoritative attacks', async ({ page }) => {
-  await page.setViewportSize({ width: 1600, height: 900 });
+  await page.setViewportSize({ width: 1600, height: 1000 });
   await page.goto('/?prototype=0');
   await expect(page.getByTestId('connection-status')).toHaveText('Connected');
   await expect(page.getByTestId('rat-health')).toHaveText('14 / 14');
@@ -22,7 +22,7 @@ test('one hostile click acquires a target and produces repeated authoritative at
 });
 
 test('Escape cancels persistent combat intent', async ({ page }) => {
-  await page.setViewportSize({ width: 1600, height: 900 });
+  await page.setViewportSize({ width: 1600, height: 1000 });
   await page.goto('/?prototype=0');
   await expect(page.getByTestId('connection-status')).toHaveText('Connected');
   const canvas = page.locator('canvas[aria-label="GlyphReach world"]');
