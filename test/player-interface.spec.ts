@@ -47,6 +47,19 @@ test('right click exposes only actions relevant to the selected world object', a
   await expect(menu).not.toContainText('Deposit');
 });
 
+test('right clicking empty ground uses the game menu instead of the browser menu', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/?prototype=0');
+  await expect(page.getByTestId('connection-status')).toHaveText('Connected');
+  const canvas = page.locator('canvas[aria-label="GlyphReach world"]');
+
+  await clickWorld(page, canvas, page.getByTestId('local-position'), { x: 440, y: 400 }, 'right');
+  const menu = page.getByTestId('world-context-menu');
+  await expect(menu).toBeVisible();
+  await expect(menu).toContainText('Ground');
+  await expect(menu.getByRole('button', { name: 'Walk here' })).toBeVisible();
+});
+
 test('left clicking copper walks into range and starts the default mining action', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/?prototype=0');
