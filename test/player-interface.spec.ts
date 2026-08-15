@@ -60,16 +60,19 @@ test('right clicking empty ground uses the game menu instead of the browser menu
   await expect(menu.getByRole('button', { name: 'Walk here' })).toBeVisible();
 });
 
-test('left clicking copper walks into range and starts the default mining action', async ({ page }) => {
+test('left clicking copper walks into range and completes the default mining action', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/?prototype=0');
   await expect(page.getByTestId('connection-status')).toHaveText('Connected');
+  await expect(page.getByTestId('copper-ore-count')).toHaveText('0');
   const canvas = page.locator('canvas[aria-label="GlyphReach world"]');
 
   await clickWorld(page, canvas, page.getByTestId('local-position'), { x: 760, y: 300 });
   await expect(page.getByTestId('player-context-panel')).toContainText('Copper vein');
-  await expect(page.getByTestId('player-activity')).toBeVisible({ timeout: 6_000 });
-  await expect(page.getByTestId('player-activity')).toContainText('Focused mining');
+  // Focused mining is intentionally short; assert the authoritative result rather
+  // than racing a transient activity pill that can disappear on completion.
+  await expect(page.getByTestId('copper-ore-count')).toHaveText('1', { timeout: 8_000 });
+  await expect(page.getByTestId('mining-xp')).not.toHaveText('0');
 });
 
 async function clickWorld(
