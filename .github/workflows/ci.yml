@@ -37,7 +37,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Exercise player-facing world controls and capture shell
-        run: npx playwright test test/player-interface.spec.ts test/combat-intent.spec.ts test/world-first-visual.spec.ts
+        run: npx playwright test --retries=0 test/player-interface.spec.ts test/combat-intent.spec.ts test/context-menu-transition.spec.ts test/world-first-visual.spec.ts
 
       - name: Emit screenshot for visual review
         if: always()
