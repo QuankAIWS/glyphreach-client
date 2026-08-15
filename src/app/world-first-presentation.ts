@@ -1,3 +1,5 @@
+import './legacy-test-layout.css';
+
 const PROTOTYPE_QUERY = 'prototype';
 
 export function applyWorldFirstPresentation(root: HTMLElement): void {
