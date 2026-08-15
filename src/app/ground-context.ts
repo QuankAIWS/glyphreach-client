@@ -5,18 +5,20 @@ export function installGroundContextMenu(root: HTMLElement): void {
 
   let boundCanvas: HTMLCanvasElement | null = null;
 
-  const bind = () => {
-    const canvas = root.querySelector<HTMLCanvasElement>('canvas[data-camera-mode="player"]');
-    if (!canvas || canvas === boundCanvas) return;
-    boundCanvas?.removeEventListener('contextmenu', onContextMenu);
-    boundCanvas = canvas;
-    canvas.addEventListener('contextmenu', onContextMenu);
+  const prepareContextMenu = () => {
+    // Clear any menu left from the previous right-click before the object
+    // interaction handler evaluates the current pointer location. If the
+    // current click is over an object that handler will immediately replace
+    // and reopen the menu; otherwise the ground handler below can safely
+    // provide Walk here instead of preserving stale object actions.
+    menu.hidden = true;
   };
 
   const onContextMenu = (event: MouseEvent) => {
     event.preventDefault();
-    // The object interaction listener runs first. If it opened a target menu,
-    // leave that richer, object-specific menu alone.
+    // The object interaction listener runs before this bubble listener. If it
+    // opened a target menu for the current right-click, leave that richer,
+    // object-specific menu alone.
     if (!menu.hidden) return;
 
     const shellRect = worldShell.getBoundingClientRect();
@@ -46,12 +48,27 @@ export function installGroundContextMenu(root: HTMLElement): void {
     menu.hidden = false;
   };
 
+  const bind = () => {
+    const canvas = root.querySelector<HTMLCanvasElement>('canvas[data-camera-mode="player"]');
+    if (!canvas || canvas === boundCanvas) return;
+    if (boundCanvas) {
+      boundCanvas.removeEventListener('contextmenu', prepareContextMenu, true);
+      boundCanvas.removeEventListener('contextmenu', onContextMenu);
+    }
+    boundCanvas = canvas;
+    canvas.addEventListener('contextmenu', prepareContextMenu, true);
+    canvas.addEventListener('contextmenu', onContextMenu);
+  };
+
   bind();
   const observer = new MutationObserver(bind);
   observer.observe(worldShell, { childList: true, subtree: true });
   window.addEventListener('beforeunload', () => {
     observer.disconnect();
-    boundCanvas?.removeEventListener('contextmenu', onContextMenu);
+    if (boundCanvas) {
+      boundCanvas.removeEventListener('contextmenu', prepareContextMenu, true);
+      boundCanvas.removeEventListener('contextmenu', onContextMenu);
+    }
   }, { once: true });
 }
 
