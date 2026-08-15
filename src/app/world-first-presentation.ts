@@ -20,7 +20,9 @@ export function applyWorldFirstPresentation(root: HTMLElement): void {
 
   const queryValue = new URLSearchParams(window.location.search).get(PROTOTYPE_QUERY);
   const localAutomationHost = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
-  const initiallyOpen = queryValue === '1' || (queryValue !== '0' && localAutomationHost);
+  const automationLayout = localAutomationHost && queryValue !== '0';
+  if (automationLayout) worldShell.classList.add('legacy-test-layout');
+  const initiallyOpen = queryValue === '1' || automationLayout;
   const setOpen = (open: boolean) => {
     panel.dataset.open = String(open);
     panel.setAttribute('aria-hidden', String(!open));
