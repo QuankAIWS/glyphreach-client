@@ -37,18 +37,11 @@ jobs:
       - name: Capture world-first shell
         run: npx playwright test test/world-first-visual.spec.ts
 
-      - name: Emit screenshot for visual review
+      - name: Upload visual review capture
         if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          image=test-results/world-first-home.jpg
-          if [[ ! -f "$image" ]]; then
-            echo "visual capture not produced: $image"
-            exit 0
-          fi
-          echo "GLYPHREACH_SCREENSHOT_BYTES=$(wc -c < "$image")"
-          echo 'GLYPHREACH_SCREENSHOT_BASE64_BEGIN'
-          base64 -w 0 "$image"
-          echo
-          echo 'GLYPHREACH_SCREENSHOT_BASE64_END'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: glyphreach-world-first
+          path: test-results/world-first-home.jpg
+          if-no-files-found: warn
+          retention-days: 7
