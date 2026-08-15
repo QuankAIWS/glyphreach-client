@@ -44,7 +44,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          image=test-results/world-first-home.png
+          image=test-results/world-first-home.jpg
           if [[ ! -f "$image" ]]; then
             echo "visual capture not produced: $image"
             exit 0
@@ -132,7 +132,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          image=test-results/world-first-home.png
+          image=test-results/world-first-home.jpg
           if [[ ! -f "$image" ]]; then
             echo "visual capture not produced: $image"
             exit 0
