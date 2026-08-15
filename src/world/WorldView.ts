@@ -27,6 +27,13 @@ const STONE_POINTS: Position[] = [
   { x: 962, y: 108 }, { x: 888, y: 155 }, { x: 936, y: 166 }, { x: 796, y: 138 },
 ];
 
+const FIELD_DETAIL_POINTS: Position[] = [
+  { x: 245, y: 224 }, { x: 302, y: 257 }, { x: 346, y: 196 }, { x: 372, y: 430 },
+  { x: 425, y: 442 }, { x: 548, y: 415 }, { x: 578, y: 331 }, { x: 635, y: 338 },
+  { x: 677, y: 270 }, { x: 732, y: 300 }, { x: 787, y: 239 }, { x: 821, y: 316 },
+  { x: 902, y: 290 }, { x: 931, y: 226 },
+];
+
 export class WorldView {
   private readonly app = new Application();
   private readonly worldLayer = new Container();
@@ -228,26 +235,36 @@ export class WorldView {
     g.rect(bounds.minX, bounds.minY, width, height).fill({ color: 0x263426 });
 
     // Settled ground: practical, worn clearings rather than abstract activity clusters.
-    g.ellipse(465, 310, 225, 168).fill({ color: 0x384334, alpha: 0.86 });
-    g.ellipse(470, 318, 155, 116).fill({ color: 0x4a4634, alpha: 0.66 });
+    g.ellipse(465, 310, 225, 168).fill({ color: 0x354032, alpha: 0.82 });
+    g.ellipse(470, 318, 150, 108).fill({ color: 0x474333, alpha: 0.62 });
     g.ellipse(748, 118, 150, 96).fill({ color: 0x33443a, alpha: 0.92 });
     g.ellipse(748, 118, 105, 65).fill({ color: 0x4b4938, alpha: 0.54 });
 
-    // Main survey road and the colder northern spur.
+    // Main survey road. Two worn bands and wheel ruts give it scale without turning it into a runway.
     g.moveTo(280, 405)
       .bezierCurveTo(390, 350, 500, 310, 610, 230)
       .bezierCurveTo(675, 183, 705, 138, 755, 112)
-      .stroke({ color: 0x5d5540, width: 50, alpha: 0.92 });
+      .stroke({ color: 0x5b5340, width: 42, alpha: 0.9 });
     g.moveTo(280, 405)
       .bezierCurveTo(390, 350, 500, 310, 610, 230)
       .bezierCurveTo(675, 183, 705, 138, 755, 112)
-      .stroke({ color: 0x81704e, width: 25, alpha: 0.72 });
+      .stroke({ color: 0x786a4c, width: 18, alpha: 0.68 });
+    g.moveTo(290, 397)
+      .bezierCurveTo(395, 345, 505, 303, 612, 224)
+      .bezierCurveTo(675, 179, 708, 135, 755, 108)
+      .stroke({ color: 0x514b3a, width: 2, alpha: 0.72 });
+    g.moveTo(275, 411)
+      .bezierCurveTo(385, 358, 494, 318, 604, 237)
+      .bezierCurveTo(668, 190, 700, 146, 751, 119)
+      .stroke({ color: 0x514b3a, width: 2, alpha: 0.58 });
+
+    // Colder northern spur.
     g.moveTo(755, 112)
       .bezierCurveTo(835, 90, 900, 70, 978, 50)
-      .stroke({ color: this.northernRoadOpen ? 0x5e5949 : 0x3d4138, width: 34, alpha: 0.88 });
+      .stroke({ color: this.northernRoadOpen ? 0x5e5949 : 0x3d4138, width: 28, alpha: 0.86 });
     g.moveTo(755, 112)
       .bezierCurveTo(835, 90, 900, 70, 978, 50)
-      .stroke({ color: this.northernRoadOpen ? 0x80765c : 0x505447, width: 15, alpha: 0.7 });
+      .stroke({ color: this.northernRoadOpen ? 0x80765c : 0x505447, width: 12, alpha: 0.66 });
 
     // Northwater river band and ford/pool language.
     g.moveTo(610, 42)
@@ -261,14 +278,14 @@ export class WorldView {
     g.moveTo(650, 54).bezierCurveTo(750, 77, 820, 62, 940, 101).stroke({ color: 0x73989a, width: 3, alpha: 0.42 });
 
     // Starter survey camp landmarks: tent, survey table, stacked crates and work scars.
-    g.ellipse(520, 320, 78, 48).fill({ color: 0x594b34, alpha: 0.55 });
-    g.moveTo(375, 286).lineTo(414, 242).lineTo(452, 286).closePath().fill({ color: 0x7a6848 }).stroke({ color: 0xb29a6a, width: 3 });
+    g.ellipse(520, 320, 78, 48).fill({ color: 0x594b34, alpha: 0.47 });
+    g.moveTo(375, 286).lineTo(414, 242).lineTo(452, 286).closePath().fill({ color: 0x756447 }).stroke({ color: 0xaa956a, width: 2 });
     g.moveTo(414, 242).lineTo(414, 286).stroke({ color: 0x463b2d, width: 2 });
-    g.rect(462, 352, 48, 27).fill({ color: 0x6e5739 }).stroke({ color: 0x9b7950, width: 2 });
-    g.rect(505, 365, 33, 22).fill({ color: 0x665036 }).stroke({ color: 0x927047, width: 2 });
-    g.rect(500, 250, 54, 25).fill({ color: 0x62503b }).stroke({ color: 0x968061, width: 2 });
-    g.moveTo(497, 249).lineTo(492, 232).stroke({ color: 0xc0aa76, width: 2 });
-    g.moveTo(557, 249).lineTo(563, 231).stroke({ color: 0xc0aa76, width: 2 });
+    g.rect(462, 352, 48, 27).fill({ color: 0x6e5739 }).stroke({ color: 0x907047, width: 1.5 });
+    g.rect(505, 365, 33, 22).fill({ color: 0x665036 }).stroke({ color: 0x876847, width: 1.5 });
+    g.rect(500, 250, 54, 25).fill({ color: 0x62503b }).stroke({ color: 0x8e795d, width: 1.5 });
+    g.moveTo(497, 249).lineTo(492, 232).stroke({ color: 0xb7a06f, width: 2 });
+    g.moveTo(557, 249).lineTo(563, 231).stroke({ color: 0xb7a06f, width: 2 });
 
     // Northwatch structures: watch shelter, cooking yard and simple timber posts.
     g.rect(660, 132, 85, 45).fill({ color: 0x4b493a, alpha: 0.8 }).stroke({ color: 0x776f55, width: 3 });
@@ -296,10 +313,20 @@ export class WorldView {
       g.circle(tree.x, tree.y - 24, 16).fill({ color: 0x304b31 });
     }
 
+    // Small grass marks and stones stop the clearings from reading as flat UI ellipses.
+    for (const detail of FIELD_DETAIL_POINTS) {
+      g.moveTo(detail.x - 5, detail.y + 5).lineTo(detail.x - 2, detail.y - 4).stroke({ color: 0x526246, width: 1.5, alpha: 0.62 });
+      g.moveTo(detail.x, detail.y + 5).lineTo(detail.x + 1, detail.y - 7).stroke({ color: 0x647152, width: 1.5, alpha: 0.56 });
+      g.moveTo(detail.x + 5, detail.y + 5).lineTo(detail.x + 4, detail.y - 3).stroke({ color: 0x46583e, width: 1.5, alpha: 0.6 });
+    }
+    for (const stone of [{ x: 332, y: 382 }, { x: 448, y: 212 }, { x: 548, y: 291 }, { x: 634, y: 246 }, { x: 704, y: 176 }]) {
+      g.ellipse(stone.x, stone.y, 6, 3).fill({ color: 0x77715f, alpha: 0.58 });
+    }
+
     // Sparse survey stakes keep the field-survey identity present without labels.
     for (const stake of [{ x: 322, y: 340 }, { x: 595, y: 270 }, { x: 640, y: 192 }, { x: 790, y: 96 }]) {
-      g.rect(stake.x - 2, stake.y - 16, 4, 28).fill({ color: 0xa58b57 });
-      g.moveTo(stake.x - 8, stake.y - 8).lineTo(stake.x + 8, stake.y - 8).stroke({ color: 0xc2a66b, width: 2 });
+      g.rect(stake.x - 2, stake.y - 16, 4, 28).fill({ color: 0x9a8153 });
+      g.moveTo(stake.x - 8, stake.y - 8).lineTo(stake.x + 8, stake.y - 8).stroke({ color: 0xb59b65, width: 2 });
     }
   }
 
@@ -309,13 +336,27 @@ export class WorldView {
     if (!road || !waystone) return;
 
     road.clear();
-    road
-      .rect(-26, -5, 52, 10)
-      .fill({ color: this.northernRoadOpen ? 0x786e4b : 0x533b35 })
-      .stroke({ color: this.northernRoadOpen ? 0xb8a66e : 0x9b655b, width: 2 });
-    if (!this.northernRoadOpen) {
-      road.moveTo(-16, -16).lineTo(16, 16).stroke({ color: 0xb86858, width: 4 });
-      road.moveTo(16, -16).lineTo(-16, 16).stroke({ color: 0xb86858, width: 4 });
+    road.rotation = -0.48;
+    if (this.northernRoadOpen) {
+      road
+        .rect(-2, -18, 4, 36)
+        .fill({ color: 0x675139 })
+        .moveTo(0, -12)
+        .lineTo(19, -15)
+        .lineTo(19, -4)
+        .lineTo(0, -2)
+        .closePath()
+        .fill({ color: 0x7d6848 })
+        .stroke({ color: 0xaa9363, width: 1.5 });
+    } else {
+      road.rect(-25, -17, 5, 34).fill({ color: 0x59442f });
+      road.rect(20, -17, 5, 34).fill({ color: 0x59442f });
+      road.moveTo(-23, -11).lineTo(23, -6).stroke({ color: 0x765737, width: 6 });
+      road.moveTo(-23, -1).lineTo(23, 4).stroke({ color: 0x765737, width: 6 });
+      road.moveTo(-23, 9).lineTo(23, 14).stroke({ color: 0x765737, width: 6 });
+      road.rect(12, -10, 5, 9).fill({ color: 0xa05f4f });
+      road.circle(-20, -14, 2).fill({ color: 0xc1a36a });
+      road.circle(22, -14, 2).fill({ color: 0xc1a36a });
     }
     this.positionGraphic(road, NORTH_GATE);
 
@@ -351,20 +392,25 @@ export class WorldView {
       let graphic = this.playerGraphics.get(player.id);
       if (!graphic) {
         const local = player.id === this.localPlayerId;
-        graphic = new Graphics()
-          .ellipse(2, 16, local ? 14 : 12, 6)
-          .fill({ color: 0x111411, alpha: 0.48 })
-          .circle(0, -10, local ? 7 : 6)
-          .fill({ color: local ? 0xd8b987 : 0xb7c2c5 })
-          .moveTo(local ? -11 : -9, -2)
-          .lineTo(local ? 11 : 9, -2)
-          .lineTo(local ? 8 : 7, 17)
-          .lineTo(local ? -8 : -7, 17)
-          .closePath()
-          .fill({ color: local ? 0xb99945 : 0x56758a })
-          .stroke({ color: local ? 0xf1d98b : 0x9ec1d3, width: 2 });
+        graphic = new Graphics();
+        graphic.ellipse(2, 17, local ? 13 : 11, 5).fill({ color: 0x111411, alpha: 0.45 });
         if (local) {
-          graphic.circle(0, 3, 3).fill({ color: 0xefe0a8 });
+          graphic.ellipse(0, 8, 13, 8).stroke({ color: 0xe5c873, width: 1.5, alpha: 0.62 });
+        }
+        graphic.rect(-7, 9, 5, 11).fill({ color: local ? 0x5c5139 : 0x45535b });
+        graphic.rect(2, 9, 5, 11).fill({ color: local ? 0x5c5139 : 0x45535b });
+        graphic.circle(0, -10, 6.5).fill({ color: local ? 0xd4ae7b : 0xb7c2c5 });
+        graphic
+          .moveTo(-9, -2)
+          .lineTo(9, -2)
+          .lineTo(7, 11)
+          .lineTo(-7, 11)
+          .closePath()
+          .fill({ color: local ? 0x8f7337 : 0x4f6b79 })
+          .stroke({ color: local ? 0xd8bd70 : 0x88a9b8, width: 1.5 });
+        if (local) {
+          graphic.rect(4, 0, 4, 8).fill({ color: 0x5c4b34 });
+          graphic.moveTo(-5, 2).lineTo(4, 2).stroke({ color: 0xe0c987, width: 1 });
         }
         this.playerGraphics.set(player.id, graphic);
         this.worldLayer.addChild(graphic);
@@ -506,17 +552,21 @@ export class WorldView {
         existing.destroy();
       }
       const cook = npc.id === 'northwatch-cook-alpha-1';
-      const graphic = new Graphics()
-        .ellipse(2, 21, 14, 6).fill({ color: 0x111411, alpha: 0.45 })
-        .circle(0, -11, 7).fill({ color: cook ? 0xd19b72 : 0xb98a61 })
-        .moveTo(-11, -2).lineTo(11, -2).lineTo(9, 21).lineTo(-9, 21).closePath()
+      const graphic = new Graphics();
+      graphic.ellipse(2, 20, 12, 5).fill({ color: 0x111411, alpha: 0.42 });
+      graphic.rect(-7, 10, 5, 10).fill({ color: cook ? 0x4f4139 : 0x3d504e });
+      graphic.rect(2, 10, 5, 10).fill({ color: cook ? 0x4f4139 : 0x3d504e });
+      graphic.circle(0, -10, 6.5).fill({ color: cook ? 0xd19b72 : 0xb98a61 });
+      graphic
+        .moveTo(-9, -2).lineTo(9, -2).lineTo(7, 11).lineTo(-7, 11).closePath()
         .fill({ color: cook ? 0x70594f : 0x526b68 })
-        .stroke({ color: cook ? 0xc5ac93 : 0x8caaa1, width: 2 });
+        .stroke({ color: cook ? 0xb79e89 : 0x82a198, width: 1.5 });
       if (cook) {
-        graphic.rect(-9, -21, 18, 5).fill({ color: 0xd8d2c3 });
-        graphic.rect(-7, -25, 14, 5).fill({ color: 0xd8d2c3 });
+        graphic.rect(-8, -20, 16, 4).fill({ color: 0xd8d2c3 });
+        graphic.rect(-6, -24, 12, 5).fill({ color: 0xd8d2c3 });
       } else {
-        graphic.moveTo(7, 2).lineTo(15, 15).stroke({ color: 0xb29b68, width: 2 });
+        graphic.moveTo(6, 2).lineTo(12, 14).stroke({ color: 0xb29b68, width: 2 });
+        graphic.circle(12, 14, 2).fill({ color: 0xc3ad78 });
       }
       this.positionGraphic(graphic, npc.position);
       this.npcGraphics.set(npc.id, graphic);
