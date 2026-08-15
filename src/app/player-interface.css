@@ -1,0 +1,346 @@
+.player-interface {
+  position: absolute;
+  inset: 0;
+  z-index: 18;
+  pointer-events: none;
+  color: #eef0e8;
+}
+
+.player-interface button {
+  pointer-events: auto;
+}
+
+.world-hover-label {
+  position: absolute;
+  z-index: 55;
+  min-width: 118px;
+  max-width: 240px;
+  padding: 7px 9px;
+  border: 1px solid rgba(219, 202, 145, 0.32);
+  border-radius: 7px;
+  background: rgba(8, 11, 9, 0.93);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.42);
+  pointer-events: none;
+  transform: translateZ(0);
+}
+.world-hover-label strong,
+.world-hover-label span { display: block; }
+.world-hover-label strong { color: #efe5bf; font-size: 12px; font-weight: 650; }
+.world-hover-label span { margin-top: 1px; color: #aab1a6; font-size: 10px; }
+
+.world-selection-ring {
+  position: absolute;
+  z-index: 17;
+  width: 62px;
+  height: 30px;
+  margin-left: -31px;
+  margin-top: -15px;
+  border: 2px solid rgba(224, 201, 120, 0.8);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(12, 16, 12, 0.45), inset 0 0 18px rgba(224, 201, 120, 0.11);
+  pointer-events: none;
+}
+
+.world-context-menu {
+  position: absolute;
+  z-index: 70;
+  width: 210px;
+  padding: 6px;
+  border: 1px solid rgba(218, 198, 139, 0.34);
+  border-radius: 7px;
+  background: rgba(9, 12, 10, 0.97);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.52);
+  pointer-events: auto;
+}
+.context-menu-title {
+  padding: 7px 8px 6px;
+  color: #c8b873;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.world-context-menu button {
+  width: 100%;
+  min-height: 32px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #e7e9e1;
+  text-align: left;
+}
+.world-context-menu button:hover { background: rgba(98, 116, 87, 0.28); }
+
+.player-context-panel,
+.player-dialogue {
+  position: absolute;
+  z-index: 42;
+  pointer-events: auto;
+  border: 1px solid rgba(215, 198, 139, 0.28);
+  background:
+    linear-gradient(180deg, rgba(20, 25, 20, 0.97), rgba(10, 14, 11, 0.96));
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(12px);
+}
+
+.player-context-panel.target-summary {
+  right: 18px;
+  top: 92px;
+  width: min(310px, calc(100% - 36px));
+  padding: 13px 15px;
+  border-radius: 12px 5px 5px 12px;
+  display: grid;
+  gap: 4px;
+}
+.target-summary > strong { color: #f0e5ba; font-family: Georgia, 'Times New Roman', serif; font-size: 18px; font-weight: 600; }
+.target-summary > span:not(.panel-kicker) { color: #c5cbc0; font-size: 12px; line-height: 1.42; }
+.target-summary > small { margin-top: 3px; color: #8f988d; font-size: 9px; }
+
+.panel-kicker {
+  color: #c6b368;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.player-context-panel.utility-panel {
+  top: 76px;
+  right: 18px;
+  bottom: 78px;
+  width: min(510px, calc(100% - 36px));
+  padding: 18px;
+  border-radius: 14px 5px 5px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.player-context-panel.service-panel { width: min(720px, calc(100% - 36px)); }
+.panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 5px;
+}
+.panel-header > div { display: grid; gap: 2px; }
+.panel-title { color: #f1e6bd; font-family: Georgia, 'Times New Roman', serif; font-size: 24px; font-weight: 600; }
+.panel-close {
+  min-width: 34px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  border-color: rgba(187, 180, 147, 0.22);
+  background: rgba(255, 255, 255, 0.035);
+  color: #c7cdc3;
+  font-size: 20px;
+  line-height: 1;
+  text-align: center;
+}
+.panel-subtitle { margin: 0 0 16px; color: #9fa79c; font-size: 11px; line-height: 1.45; }
+.panel-empty { padding: 20px 8px; color: #929b90; font-size: 12px; text-align: center; }
+
+.player-quickbar {
+  position: absolute;
+  z-index: 48;
+  right: 18px;
+  bottom: 78px;
+  display: flex;
+  gap: 5px;
+  pointer-events: auto;
+}
+.player-quickbar button {
+  min-width: 62px;
+  min-height: 38px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(206, 190, 134, 0.25);
+  background: rgba(14, 19, 15, 0.91);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  color: #daddd4;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-align: center;
+}
+.player-quickbar button:hover,
+.player-quickbar button[data-active='true'] {
+  border-color: rgba(220, 200, 137, 0.55);
+  background: rgba(52, 62, 47, 0.95);
+  color: #f0e4bb;
+}
+
+.player-dialogue {
+  left: 50%;
+  bottom: 88px;
+  width: min(760px, calc(100% - 48px));
+  padding: 16px 18px 18px;
+  border-radius: 12px;
+  transform: translateX(-50%);
+}
+.player-dialogue > strong { display: block; margin-top: 3px; color: #f0e4b8; font-family: Georgia, 'Times New Roman', serif; font-size: 20px; font-weight: 600; }
+.player-dialogue p { margin: 8px 0 12px; color: #d1d5cc; font-size: 13px; line-height: 1.55; }
+.dialogue-choice-list { display: flex; flex-wrap: wrap; gap: 7px; }
+.dialogue-choice-list button {
+  flex: 1 1 210px;
+  border-color: rgba(203, 186, 127, 0.28);
+  background: #1d281e;
+  text-align: left;
+}
+
+.player-activity {
+  position: absolute;
+  z-index: 40;
+  top: 18px;
+  left: 50%;
+  min-width: 260px;
+  padding: 8px 9px 8px 12px;
+  border: 1px solid rgba(206, 189, 130, 0.26);
+  border-radius: 999px;
+  background: rgba(11, 15, 12, 0.91);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.34);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  pointer-events: auto;
+}
+.player-activity span { display: grid; gap: 1px; }
+.player-activity small { color: #a9985d; font-size: 8px; font-weight: 800; letter-spacing: 0.16em; }
+.player-activity strong { color: #e8e0c1; font-size: 11px; }
+.player-activity button { min-height: 28px; padding: 4px 10px; border-radius: 999px; font-size: 10px; }
+
+.item-list { display: grid; gap: 6px; margin-top: 12px; }
+.item-list.compact { margin-top: 7px; }
+.item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 7px 9px;
+  border: 1px solid rgba(170, 177, 159, 0.12);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.025);
+}
+.item-name { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.item-name > span:last-child { display: grid; min-width: 0; }
+.item-name strong { overflow: hidden; color: #dfe2d8; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.item-name small { color: #919a8f; font-size: 10px; }
+.item-glyph {
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(206, 190, 132, 0.18);
+  border-radius: 6px;
+  background: rgba(100, 91, 59, 0.13);
+  color: #c9b46e;
+  font-family: Georgia, serif;
+  font-size: 18px;
+}
+.item-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+.item-actions:empty { display: none; }
+.item-actions button {
+  min-height: 28px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  font-size: 9px;
+  text-align: center;
+}
+
+.bank-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px; }
+.bank-columns h3 { margin: 0; color: #b8c0b4; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }
+
+.merchant-list { display: grid; gap: 7px; margin-top: 13px; }
+.merchant-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) auto;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px;
+  border: 1px solid rgba(170, 177, 159, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+}
+.merchant-row > div:first-child { display: grid; }
+.merchant-row strong { color: #e2e3db; font-size: 12px; }
+.merchant-row small { color: #929b90; font-size: 9px; }
+.merchant-prices { display: flex; gap: 9px; color: #9fa79c; font-size: 9px; }
+.merchant-prices b { color: #dccb8d; font-size: 11px; }
+.merchant-row .item-actions { grid-column: 1 / -1; justify-content: flex-start; }
+
+.recipe-list { display: grid; gap: 8px; margin-top: 14px; }
+.recipe-card {
+  display: grid;
+  gap: 3px;
+  min-height: 58px;
+  padding: 11px 12px;
+  border-color: rgba(191, 173, 116, 0.24);
+  border-radius: 8px;
+  background: rgba(80, 69, 45, 0.12);
+}
+.recipe-card strong { color: #e4ddc2; font-size: 12px; }
+.recipe-card small { color: #969e92; font-size: 9px; }
+
+.quest-list { display: grid; gap: 9px; margin-top: 12px; }
+.quest-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  padding: 11px;
+  border: 1px solid rgba(174, 181, 163, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.024);
+}
+.quest-card > strong { color: #e2dec8; font-family: Georgia, 'Times New Roman', serif; font-size: 16px; font-weight: 600; }
+.quest-state { grid-column: 2; grid-row: 1; align-self: start; color: #a9b3a4; font-size: 8px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+.quest-completed { color: #78a974; }
+.quest-active { color: #d1ba6d; }
+.quest-objectives { grid-column: 1 / -1; display: grid; gap: 5px; margin-top: 4px; }
+.quest-objectives > div { display: grid; grid-template-columns: 16px 1fr; gap: 5px; color: #aab1a6; font-size: 10px; line-height: 1.35; }
+.quest-objectives > div[data-complete='true'] { color: #7f9681; }
+.quest-objectives > div > span:first-child { color: #c6b66f; }
+
+.skill-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+.skill-card {
+  min-height: 86px;
+  padding: 11px;
+  border: 1px solid rgba(177, 184, 165, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  display: grid;
+  align-content: center;
+  gap: 1px;
+}
+.skill-card span { color: #aab2a7; font-size: 10px; }
+.skill-card strong { color: #e5d9a9; font-family: Georgia, serif; font-size: 27px; font-weight: 500; }
+.skill-card small { color: #858f84; font-size: 9px; }
+
+/* The command harness is deliberately unavailable to normal staging players.
+   It remains in the DOM for localhost automation and explicit ?dev=1 diagnostics. */
+.world-first-stage:not(.dev-actions-enabled) > .prototype-drawer-toggle { display: none !important; }
+.world-first-stage:not(.dev-actions-enabled) > .prototype-drawer { display: none !important; }
+
+@media (max-width: 900px) {
+  .player-context-panel.target-summary { top: 78px; right: 12px; }
+  .player-context-panel.utility-panel,
+  .player-context-panel.service-panel { left: 12px; right: 12px; top: 70px; bottom: 72px; width: auto; }
+  .player-quickbar { right: 12px; bottom: 72px; }
+  .player-dialogue { bottom: 78px; width: calc(100% - 24px); }
+  .bank-columns { grid-template-columns: 1fr; }
+  .player-activity { top: 11px; max-width: calc(100% - 220px); min-width: 220px; }
+}
+
+@media (max-width: 620px) {
+  .player-context-panel.target-summary { left: 12px; right: 12px; top: 78px; width: auto; }
+  .player-quickbar { left: 12px; right: 12px; bottom: 68px; justify-content: flex-end; }
+  .player-quickbar button { flex: 0 1 72px; }
+  .player-dialogue { bottom: 118px; }
+  .player-activity { top: 72px; left: 12px; right: 12px; max-width: none; transform: none; }
+  .merchant-row { grid-template-columns: 1fr; }
+  .merchant-prices, .merchant-row .item-actions { grid-column: 1; }
+}

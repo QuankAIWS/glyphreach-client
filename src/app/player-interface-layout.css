@@ -1,0 +1,36 @@
+/* Keep persistent player navigation on a narrow side rail instead of covering
+   the lower-right world, where nearby hostiles and interactables can sit under
+   the player camera. The rail doubles as tabs beside open utility/service
+   panels; extra right padding keeps panel content clear of those tabs. */
+.player-quickbar {
+  top: 50%;
+  right: 10px;
+  bottom: auto;
+  flex-direction: column;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.player-quickbar button {
+  min-width: 58px;
+  pointer-events: auto;
+}
+
+.player-context-panel.utility-panel {
+  padding-right: 86px;
+}
+
+@media (max-width: 900px) {
+  .player-quickbar {
+    top: auto;
+    right: 50%;
+    bottom: 14px;
+    flex-direction: row;
+    transform: translateX(50%);
+  }
+
+  .player-context-panel.utility-panel {
+    bottom: 68px;
+    padding-right: 18px;
+  }
+}

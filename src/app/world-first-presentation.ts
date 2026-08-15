@@ -1,6 +1,7 @@
 import './legacy-test-layout.css';
 
 const PROTOTYPE_QUERY = 'prototype';
+const DEV_QUERY = 'dev';
 
 export function applyWorldFirstPresentation(root: HTMLElement): void {
   const shell = root.querySelector<HTMLElement>('.shell');
@@ -11,29 +12,36 @@ export function applyWorldFirstPresentation(root: HTMLElement): void {
   shell.classList.add('world-first-shell');
   worldShell.classList.add('world-first-stage');
   panel.classList.add('prototype-drawer');
-  panel.setAttribute('aria-label', 'Prototype actions and diagnostics');
+  panel.setAttribute('aria-label', 'Development actions and diagnostics');
+  panel.id = 'glyphreach-prototype-drawer';
+
+  const query = new URLSearchParams(window.location.search);
+  const prototypeValue = query.get(PROTOTYPE_QUERY);
+  const localAutomationHost = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+  const automationLayout = localAutomationHost && prototypeValue !== '0';
+  const explicitDev = query.get(DEV_QUERY) === '1';
+  const devActionsEnabled = automationLayout || explicitDev;
+
+  if (automationLayout) worldShell.classList.add('legacy-test-layout');
+  if (devActionsEnabled) worldShell.classList.add('dev-actions-enabled');
 
   const toggle = document.createElement('button');
   toggle.type = 'button';
   toggle.className = 'prototype-drawer-toggle';
   toggle.dataset.testid = 'prototype-controls-toggle';
-  toggle.setAttribute('aria-controls', 'glyphreach-prototype-drawer');
-  panel.id = 'glyphreach-prototype-drawer';
+  toggle.setAttribute('aria-controls', panel.id);
 
-  const queryValue = new URLSearchParams(window.location.search).get(PROTOTYPE_QUERY);
-  const localAutomationHost = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
-  const automationLayout = localAutomationHost && queryValue !== '0';
-  if (automationLayout) worldShell.classList.add('legacy-test-layout');
-  const initiallyOpen = queryValue === '1' || automationLayout;
+  const initiallyOpen = automationLayout || (explicitDev && prototypeValue === '1');
   const setOpen = (open: boolean) => {
-    panel.dataset.open = String(open);
-    panel.setAttribute('aria-hidden', String(!open));
-    toggle.setAttribute('aria-expanded', String(open));
-    toggle.textContent = open ? 'Close actions' : 'Actions';
+    const allowedOpen = devActionsEnabled && open;
+    panel.dataset.open = String(allowedOpen);
+    panel.setAttribute('aria-hidden', String(!allowedOpen));
+    toggle.setAttribute('aria-expanded', String(allowedOpen));
+    toggle.textContent = allowedOpen ? 'Close dev' : 'Dev';
   };
   toggle.addEventListener('click', () => setOpen(panel.dataset.open !== 'true'));
   setOpen(initiallyOpen);
-  worldShell.append(toggle);
+  if (devActionsEnabled) worldShell.append(toggle);
 
   const hud = document.createElement('div');
   hud.className = 'world-hud';
@@ -42,7 +50,7 @@ export function applyWorldFirstPresentation(root: HTMLElement): void {
     <div class="hud-card hud-place">
       <span class="hud-kicker">THE REACH</span>
       <strong data-testid="hud-location">Starter survey camp</strong>
-      <span class="hud-subtle">Click the ground to move</span>
+      <span class="hud-subtle">Left-click the world · right-click for options</span>
     </div>
     <div class="hud-card hud-online">
       <span><i class="hud-dot"></i><strong data-testid="hud-connection">Connecting…</strong></span>
