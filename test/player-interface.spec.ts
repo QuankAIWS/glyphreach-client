@@ -32,7 +32,7 @@ test('player can click world objects instead of using the global action harness'
 });
 
 test('right click exposes only actions relevant to the selected world object', async ({ page }) => {
-  await page.setViewportSize({ width: 1200, height: 750 });
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/?prototype=0');
   await expect(page.getByTestId('connection-status')).toHaveText('Connected');
   const canvas = page.locator('canvas[aria-label="GlyphReach world"]');
@@ -45,6 +45,18 @@ test('right click exposes only actions relevant to the selected world object', a
   await expect(menu).toContainText('Mine · steady / AFK');
   await expect(menu).not.toContainText('Buy');
   await expect(menu).not.toContainText('Deposit');
+});
+
+test('left clicking copper walks into range and starts the default mining action', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/?prototype=0');
+  await expect(page.getByTestId('connection-status')).toHaveText('Connected');
+  const canvas = page.locator('canvas[aria-label="GlyphReach world"]');
+
+  await clickWorld(page, canvas, page.getByTestId('local-position'), { x: 760, y: 300 });
+  await expect(page.getByTestId('player-context-panel')).toContainText('Copper vein');
+  await expect(page.getByTestId('player-activity')).toBeVisible({ timeout: 6_000 });
+  await expect(page.getByTestId('player-activity')).toContainText('Focused mining');
 });
 
 async function clickWorld(
@@ -62,7 +74,12 @@ async function clickWorld(
 
   const cameraX = clamp(box.width / 2 - localX * 2, box.width - 2000, 0);
   const cameraY = clamp(box.height / 2 - localY * 2, box.height - 1200, 0);
-  await page.mouse.click(box.x + cameraX + world.x * 2, box.y + cameraY + world.y * 2, { button });
+  const x = box.x + cameraX + world.x * 2;
+  const y = box.y + cameraY + world.y * 2;
+  if (x < box.x || x > box.x + box.width || y < box.y || y > box.y + box.height) {
+    throw new Error(`World target ${world.x},${world.y} is outside the visible camera at ${x},${y}`);
+  }
+  await page.mouse.click(x, y, { button });
 }
 
 function clamp(value: number, min: number, max: number): number {
