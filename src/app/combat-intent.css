@@ -1,0 +1,63 @@
+.combat-target-hud {
+  position: absolute;
+  z-index: 46;
+  top: 76px;
+  left: 50%;
+  width: min(330px, calc(100% - 420px));
+  padding: 9px 12px 8px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(184, 92, 70, 0.42);
+  border-radius: 9px;
+  background: linear-gradient(180deg, rgba(29, 19, 16, 0.95), rgba(13, 12, 10, 0.93));
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.38);
+  pointer-events: none;
+}
+.combat-target-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+}
+.combat-target-heading > span { display: grid; gap: 1px; }
+.combat-target-heading small {
+  color: #ba806f;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+.combat-target-heading strong {
+  color: #f0ded4;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 16px;
+  font-weight: 600;
+}
+.combat-target-heading b { color: #d7c7bf; font-size: 10px; font-weight: 650; }
+.combat-target-bar {
+  height: 5px;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+}
+.combat-target-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #834936, #c56d52);
+  transition: width 120ms linear;
+}
+.combat-target-state {
+  display: block;
+  margin-top: 4px;
+  color: #a99d97;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+@media (max-width: 900px) {
+  .combat-target-hud { top: 68px; width: min(300px, calc(100% - 280px)); }
+}
+@media (max-width: 620px) {
+  .combat-target-hud { top: 118px; width: calc(100% - 24px); }
+}
