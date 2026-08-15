@@ -75,6 +75,48 @@ test('left clicking copper walks into range and completes the default mining act
   await expect(page.getByTestId('mining-xp')).not.toHaveText('0');
 });
 
+test('banking and trading exist only at their physical world services', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/?prototype=0');
+  await expect(page.getByTestId('connection-status')).toHaveText('Connected');
+  const canvas = page.locator('canvas[aria-label="GlyphReach world"]');
+  const position = page.getByTestId('local-position');
+
+  await clickWorld(page, canvas, position, { x: 760, y: 300 });
+  await expect(page.getByTestId('copper-ore-count')).toHaveText('1', { timeout: 8_000 });
+
+  await clickWorld(page, canvas, position, { x: 300, y: 180 });
+  const bank = page.getByTestId('player-context-panel');
+  await expect(bank).toContainText('Bank', { timeout: 6_000 });
+  const oreRow = bank.locator('.item-row').filter({ hasText: 'Copper ore' });
+  await expect(oreRow).toBeVisible();
+  await oreRow.getByRole('button', { name: 'All' }).click();
+  await expect(page.getByTestId('bank-copper-ore-count')).toHaveText('1');
+  await expect(page.getByTestId('copper-ore-count')).toHaveText('0');
+
+  // Merchant is a different world object and opens a different focused interface.
+  await clickWorld(page, canvas, position, { x: 300, y: 420 });
+  const merchant = page.getByTestId('player-context-panel');
+  await expect(merchant).toContainText('Merchant', { timeout: 6_000 });
+  await expect(merchant).toContainText('Copper ore');
+  await expect(merchant.getByRole('button', { name: 'Buy 1' }).first()).toBeVisible();
+  await expect(merchant).not.toContainText('Stored');
+});
+
+test('workstations expose only recipes for the world station being used', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/?prototype=0');
+  await expect(page.getByTestId('connection-status')).toHaveText('Connected');
+  const canvas = page.locator('canvas[aria-label="GlyphReach world"]');
+
+  await clickWorld(page, canvas, page.getByTestId('local-position'), { x: 570, y: 155 });
+  const station = page.getByTestId('player-context-panel');
+  await expect(station).toContainText('Field furnace', { timeout: 6_000 });
+  await expect(station).toContainText('Smelt copper bar');
+  await expect(station).not.toContainText('Buy 1');
+  await expect(station).not.toContainText('Stored');
+});
+
 async function clickWorld(
   page: Page,
   canvas: Locator,
