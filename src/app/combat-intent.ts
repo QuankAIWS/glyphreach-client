@@ -24,7 +24,6 @@ export function installCombatIntent(root: HTMLElement, app: GlyphReachApp): void
 }
 
 class CombatIntentController {
-  private canvas: HTMLCanvasElement | null = null;
   private targetId: string | null = null;
   private contextEnemyId: string | null = null;
   private nextAttackAt = 0;
@@ -44,7 +43,10 @@ class CombatIntentController {
   }
 
   start(): void {
-    this.bindCanvas();
+    // Delegate from the stable shell instead of attaching listeners after Pixi's
+    // async canvas mount. This makes the first player click as reliable as later ones.
+    this.worldShell.addEventListener('pointerdown', this.onPointerDown, true);
+    this.worldShell.addEventListener('contextmenu', this.onContextMenu, true);
     this.worldShell.addEventListener('click', this.onWorldShellClick, true);
     window.addEventListener('keydown', this.onKeyDown);
     this.timer = window.setInterval(() => this.tick(), 100);
@@ -53,35 +55,21 @@ class CombatIntentController {
 
   private destroy(): void {
     window.clearInterval(this.timer);
-    this.unbindCanvas();
+    this.worldShell.removeEventListener('pointerdown', this.onPointerDown, true);
+    this.worldShell.removeEventListener('contextmenu', this.onContextMenu, true);
     this.worldShell.removeEventListener('click', this.onWorldShellClick, true);
     window.removeEventListener('keydown', this.onKeyDown);
   }
 
-  private bindCanvas(): void {
-    const next = this.root.querySelector<HTMLCanvasElement>('canvas[data-camera-mode="player"]');
-    if (!next || next === this.canvas) return;
-    this.unbindCanvas();
-    this.canvas = next;
-    next.addEventListener('pointerdown', this.onPointerDown);
-    next.addEventListener('contextmenu', this.onContextMenu);
-  }
-
-  private unbindCanvas(): void {
-    if (!this.canvas) return;
-    this.canvas.removeEventListener('pointerdown', this.onPointerDown);
-    this.canvas.removeEventListener('contextmenu', this.onContextMenu);
-    this.canvas = null;
-  }
-
   private readonly onPointerDown = (event: PointerEvent): void => {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || !isPlayerCanvas(event.target)) return;
     const enemy = this.enemyAt(event.clientX, event.clientY);
     if (enemy?.alive) this.acquire(enemy.id);
     else this.clear();
   };
 
   private readonly onContextMenu = (event: MouseEvent): void => {
+    if (!isPlayerCanvas(event.target)) return;
     this.contextEnemyId = this.enemyAt(event.clientX, event.clientY)?.id ?? null;
   };
 
@@ -111,7 +99,6 @@ class CombatIntentController {
   }
 
   private tick(): void {
-    this.bindCanvas();
     if (!this.targetId) return;
     const enemy = this.state.enemies.find((candidate) => candidate.id === this.targetId);
     const combat = this.state.combat;
@@ -158,7 +145,7 @@ class CombatIntentController {
   }
 
   private screenToWorld(clientX: number, clientY: number): Position | null {
-    const canvas = this.canvas;
+    const canvas = this.root.querySelector<HTMLCanvasElement>('canvas[data-camera-mode="player"]');
     const local = this.localPosition();
     if (!canvas || !local) return null;
     const rect = canvas.getBoundingClientRect();
@@ -175,6 +162,10 @@ class CombatIntentController {
     const [x, y] = text.split(',').map((part) => Number(part.trim()));
     return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
   }
+}
+
+function isPlayerCanvas(target: EventTarget | null): target is HTMLCanvasElement {
+  return target instanceof HTMLCanvasElement && target.dataset.cameraMode === 'player';
 }
 
 function enemyName(enemy: EnemySnapshot): string {
