@@ -22,8 +22,8 @@ void app.mount(root);
 applyStoryPolish(root);
 applyM9Chapter(root, app);
 applyWorldFirstPresentation(root);
-installGroundContextMenu(root);
 installPlayerInterface(root, app);
+installGroundContextMenu(root);
 installCombatIntent(root, app);
 installChapterLandmarks(root, app);
 
