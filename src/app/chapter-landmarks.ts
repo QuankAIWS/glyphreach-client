@@ -1,5 +1,5 @@
 import type { GlyphReachApp } from './App';
-import type { PlayerProgressSnapshot, Position } from '../protocol/v1';
+import type { Position } from '../protocol/v1';
 import type { QuestJournalSnapshot } from '../protocol/quest-v1';
 import './chapter-landmarks.css';
 
@@ -7,7 +7,6 @@ const CAMERA_SCALE = 2;
 const WORLD = { minX: 0, minY: 0, maxX: 1000, maxY: 600 } as const;
 
 type AppState = {
-  progress: PlayerProgressSnapshot | null;
   quests: QuestJournalSnapshot[];
 };
 
@@ -15,11 +14,10 @@ type Landmark = {
   id: string;
   label: string;
   position: Position;
-  kind: 'waystone' | 'vault' | 'ledger' | 'cache';
+  kind: 'vault' | 'ledger' | 'cache';
 };
 
 const LANDMARKS: Record<Landmark['kind'], Landmark> = {
-  waystone: { id: 'weathered-waystone-alpha-1', label: 'Weathered waystone', position: { x: 955, y: 55 }, kind: 'waystone' },
   vault: { id: 'northreach-vault-alpha-1', label: 'Northreach vault entrance', position: { x: 900, y: 270 }, kind: 'vault' },
   ledger: { id: 'northreach-ledger-wall-alpha-1', label: 'Resonant survey mark', position: { x: 944, y: 318 }, kind: 'ledger' },
   cache: { id: 'northreach-cache-alpha-1', label: 'Collapsed survey cache', position: { x: 972, y: 474 }, kind: 'cache' },
@@ -74,11 +72,9 @@ class ChapterLandmarkLayer {
   }
 
   private visibleLandmarks(): Landmark[] {
-    const out: Landmark[] = [];
-    if (this.state.progress?.worldFlags.northernRoadOpen) out.push(LANDMARKS.waystone);
     const stone = this.state.quests.find((quest) => quest.questId === 'stone-below-alpha');
-    if (stone?.status !== 'active') return out;
-    out.push(LANDMARKS.vault);
+    if (stone?.status !== 'active') return [];
+    const out: Landmark[] = [LANDMARKS.vault];
     const foundVault = stone.objectives.find((objective) => objective.id === 'find_vault')?.complete ?? false;
     if (foundVault) out.push(LANDMARKS.ledger, LANDMARKS.cache);
     return out;
@@ -108,7 +104,6 @@ class ChapterLandmarkLayer {
 }
 
 function landmarkMarkup(kind: Landmark['kind']): string {
-  if (kind === 'waystone') return '<i class="stone-shadow"></i><i class="stone-body"><b></b><b></b><b></b></i>';
   if (kind === 'vault') return '<i class="vault-shadow"></i><i class="vault-left"></i><i class="vault-right"></i><i class="vault-cap"></i><i class="vault-dark"></i>';
   if (kind === 'ledger') return '<i class="ledger-shadow"></i><i class="ledger-slab"><b></b><b></b><b></b></i>';
   return '<i class="cache-shadow"></i><i class="cache-stone cache-a"></i><i class="cache-stone cache-b"></i><i class="cache-box"></i>';
