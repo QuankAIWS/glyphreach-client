@@ -1,0 +1,93 @@
+.chapter-landmark-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 14;
+  overflow: hidden;
+  pointer-events: none;
+}
+.chapter-landmark {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+  filter: drop-shadow(0 9px 8px rgba(0, 0, 0, 0.26));
+}
+.chapter-landmark i { position: absolute; display: block; }
+
+.chapter-landmark-waystone .stone-shadow {
+  left: -28px; top: 14px; width: 56px; height: 18px;
+  border-radius: 50%; background: rgba(3, 6, 5, 0.35);
+}
+.chapter-landmark-waystone .stone-body {
+  left: -13px; top: -47px; width: 26px; height: 62px;
+  border: 2px solid #63716b; border-radius: 8px 8px 5px 5px;
+  background: linear-gradient(100deg, #343e3c, #59635e 48%, #303937);
+  transform: rotate(-4deg);
+}
+.chapter-landmark-waystone .stone-body::after {
+  content: ''; position: absolute; left: -5px; bottom: -7px; width: 35px; height: 10px;
+  border-radius: 50%; background: #29312f;
+}
+.chapter-landmark-waystone .stone-body b {
+  position: absolute; left: 6px; width: 12px; height: 2px; background: rgba(116, 169, 158, 0.78);
+  box-shadow: 0 0 7px rgba(112, 174, 163, 0.48);
+}
+.chapter-landmark-waystone .stone-body b:nth-child(1) { top: 17px; transform: rotate(28deg); }
+.chapter-landmark-waystone .stone-body b:nth-child(2) { top: 29px; transform: rotate(-22deg); }
+.chapter-landmark-waystone .stone-body b:nth-child(3) { top: 41px; transform: rotate(18deg); }
+
+.chapter-landmark-vault .vault-shadow {
+  left: -48px; top: 20px; width: 96px; height: 25px; border-radius: 50%; background: rgba(2, 5, 4, 0.42);
+}
+.chapter-landmark-vault .vault-left,
+.chapter-landmark-vault .vault-right {
+  top: -29px; width: 22px; height: 52px;
+  border: 2px solid #59635f; background: linear-gradient(90deg, #303836, #46504d);
+}
+.chapter-landmark-vault .vault-left { left: -42px; transform: rotate(-4deg); }
+.chapter-landmark-vault .vault-right { left: 20px; transform: rotate(5deg); }
+.chapter-landmark-vault .vault-cap {
+  left: -39px; top: -39px; width: 80px; height: 20px;
+  border: 2px solid #626b66; border-radius: 9px 9px 2px 2px;
+  background: #424b48; transform: rotate(1deg);
+}
+.chapter-landmark-vault .vault-dark {
+  left: -19px; top: -20px; width: 38px; height: 42px;
+  border-radius: 14px 14px 3px 3px; background: linear-gradient(#111817, #050808);
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.75);
+}
+
+.chapter-landmark-ledger .ledger-shadow {
+  left: -26px; top: 15px; width: 52px; height: 14px; border-radius: 50%; background: rgba(2, 5, 4, 0.36);
+}
+.chapter-landmark-ledger .ledger-slab {
+  left: -20px; top: -34px; width: 40px; height: 48px;
+  border: 2px solid #5b6662; border-radius: 3px;
+  background: linear-gradient(110deg, #37413e, #4b5752 58%, #303835);
+  transform: rotate(3deg);
+}
+.chapter-landmark-ledger .ledger-slab b {
+  position: absolute; left: 8px; width: 22px; height: 2px;
+  background: rgba(103, 177, 163, 0.9); box-shadow: 0 0 8px rgba(103, 177, 163, 0.5);
+}
+.chapter-landmark-ledger .ledger-slab b:nth-child(1) { top: 12px; transform: rotate(15deg); }
+.chapter-landmark-ledger .ledger-slab b:nth-child(2) { top: 23px; transform: rotate(-19deg); }
+.chapter-landmark-ledger .ledger-slab b:nth-child(3) { top: 34px; transform: rotate(11deg); }
+
+.chapter-landmark-cache .cache-shadow {
+  left: -34px; top: 12px; width: 68px; height: 18px; border-radius: 50%; background: rgba(2, 5, 4, 0.4);
+}
+.chapter-landmark-cache .cache-stone {
+  width: 27px; height: 18px; border: 1px solid #56605c; border-radius: 4px; background: #3d4743;
+}
+.chapter-landmark-cache .cache-a { left: -30px; top: -8px; transform: rotate(-18deg); }
+.chapter-landmark-cache .cache-b { left: 10px; top: -5px; transform: rotate(13deg); }
+.chapter-landmark-cache .cache-box {
+  left: -18px; top: -24px; width: 36px; height: 27px;
+  border: 2px solid #746344; border-radius: 3px;
+  background: linear-gradient(#655538, #463b2b);
+  transform: rotate(-4deg);
+}
+.chapter-landmark-cache .cache-box::after {
+  content: ''; position: absolute; left: 4px; right: 4px; top: 8px; height: 2px; background: #9a8256;
+}
